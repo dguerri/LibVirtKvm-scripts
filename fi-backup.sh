@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Foobar.  If not, see <http://www.gnu.org/licenses/>. 
 #
-# fi-backup v1.0 - Forward Incremental Libvirt/KVM backup (qcow2 only)
-# Copyright (C) 2013 Davide Guerri - d.guerri@gmail.com
+# fi-backup v1.0 - Online Forward Incremental Libvirt/KVM backup
+# Copyright (C) 2013 Davide Guerri - davide.guerri@gmail.com
 #
 
 # Locking

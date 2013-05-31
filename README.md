@@ -152,11 +152,11 @@ Of course the backup images remain untouched. Each image depends on the previous
     -rw------- 1 root root      786432 May 31  2013 /nfs/backup-dir/fi-backups/DGuerri_Domain/DGuerri_Domain.bimg-20130531-125701
 
 The recovery of an incremental backup is possible using the appropriate chain.
-For instance, in order to recover the backup with timestamp 20130531-120054, the following images are needed:
+For instance, in order to recover the backup with timestamp `20130531-120054`, the following images are needed:
 
-* DGuerri_Domain.img
-* DGuerri_Domain.bimg-20130531-114338
-* DGuerri_Domain.bimg-20130531-120054
+* `DGuerri_Domain.img`
+* `DGuerri_Domain.bimg-20130531-114338`
+* `DGuerri_Domain.bimg-20130531-120054`
 
 # Contributing to LibVirtKvm-Scripts
  
