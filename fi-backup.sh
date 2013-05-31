@@ -387,7 +387,7 @@ for DOMAIN in $DOMAINS; do
          _ret=$?
          unlock $DOMAIN
       else
-         print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping bakcup of '$DOMAIN'"
+         print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping backup of '$DOMAIN'"
       fi
    fi
 

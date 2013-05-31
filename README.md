@@ -1,12 +1,12 @@
 # LibVirtKvm-Scripts
 
-## fi-backup - Forward Incremental Backup for Libvirt/KVM VMs
+## fi-backup - Online Forward Incremental Backup for Libvirt/KVM VMs
 
 fi-backup can be used to make ***online*** _forward incremental_ backup of libvirt/KVM virtual machines.
 It works on VMs with multiple disks but only if disk images are in qcow2 format.
 It also allows consolidation of backups previously taken.
 
-Please note that the integrity of these backup is not assured because fi-backup only performs bakcup of  VMs disks (CPU status and RAM aren't saved).
+Please note that the integrity of these backup is not assured because fi-backup only performs backup of VMs disks (CPU status and RAM aren't saved).
 
 See sample usage below for more information.
 
