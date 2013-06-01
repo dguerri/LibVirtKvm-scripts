@@ -173,3 +173,7 @@ For instance, in order to recover the backup with timestamp `20130531-120054`, t
 Copyright (C) 2013 Davide Guerri - Unidata S.p.A. - <davide.guerri@gmail.com>
 See LICENSE.txt for further details.
 
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/dguerri/LibVirtKvm-scripts/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
