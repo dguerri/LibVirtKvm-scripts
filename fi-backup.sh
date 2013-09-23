@@ -15,12 +15,19 @@
 # You should have received a copy of the GNU General Public License
 # along with Foobar.  If not, see <http://www.gnu.org/licenses/>. 
 #
-# fi-backup v1.0 - Online Forward Incremental Libvirt/KVM backup
+# fi-backup v1.1 - Online Forward Incremental Libvirt/KVM backup
 # Copyright (C) 2013 Davide Guerri - davide.guerri@gmail.com
 #
 
-# Locking
+# Executables
+QEMU_IMG="/usr/bin/qemu-img"
+VIRSH="/usr/bin/virsh"
+KVM="/usr/bin/kvm"
+if [ -x "/usr/bin/qemu-kvm" ]; then
+   KVM="/usr/bin/qemu-kvm"
+fi
 
+# Defaults and constants
 BACKUP_DIRECTORY=
 CONSOLIDATION=0
 DEBUG=0
@@ -117,7 +124,7 @@ function snapshot_domain() {
    # Create an external snapshot for each block device
    print_v d "Snapshotting block devices for '$domain_name' using suffix '$SNAPSHOT_PREFIX-$timestamp'"
 
-   command_output=$(virsh -q snapshot-create-as "$domain_name" "$SNAPSHOT_PREFIX-$timestamp" --no-metadata --disk-only --atomic 2>&1)
+   command_output=$($VIRSH -q snapshot-create-as "$domain_name" "$SNAPSHOT_PREFIX-$timestamp" --no-metadata --disk-only --atomic 2>&1)
    _ret=$?
 
    if [ $_ret -eq 0 ]; then
@@ -129,7 +136,7 @@ function snapshot_domain() {
       fi
       if [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
          # TODO: Check if the following works even if the HD is not a virtio device (i.e. vd[a-z])
-         block_devices=$(virsh -r domblklist "$domain_name" | awk '/^vd[a-z]\s+/ {print $2}')
+         block_devices=$($VIRSH -r domblklist "$domain_name" | awk '/^vd[a-z]\s+/ {print $2}')
          _ret=$?
          if [ $_ret -ne 0 ]; then
             print_v e "Error getting block device list for domain '$domain_name'"
@@ -137,7 +144,7 @@ function snapshot_domain() {
          fi
 
          for block_device in "$block_devices"; do
-            backing_file=$(qemu-img info "$block_device" | awk '/^backing file/ { print $3 }')
+            backing_file=$($QEMU_IMG info "$block_device" | awk '/^backing file: / { print $3 }')
 
             if [ -f "$backing_file" ]; then
                new_backing_file="$BACKUP_DIRECTORY/$(basename $backing_file)"
@@ -145,7 +152,7 @@ function snapshot_domain() {
                print_v v "Copy backing file '$backing_file' to '$new_backing_file'"
                cp "$backing_file" "$new_backing_file"
 
-               parent_backing_file=$(qemu-img info "$backing_file" | awk '/^backing file/ { print $3 }')
+               parent_backing_file=$($QEMU_IMG info "$backing_file" | awk '/^backing file: / { print $3 }')
                _ret=$?
                if [ $_ret -ne 0 ]; then
                   print_v e "Problem getting backing file for '$backing_file'"
@@ -159,7 +166,7 @@ function snapshot_domain() {
                   fi
 
                   print_v v "Changing original backing file reference for '$new_backing_file' from '$parent_backing_file' to '$new_parent_backing_file'"
-                  command_output=$(qemu-img rebase -u -b "$new_parent_backing_file" "$new_backing_file")
+                  command_output=$($QEMU_IMG rebase -u -b "$new_parent_backing_file" "$new_backing_file")
                   _ret=$?
                   if [ $_ret -ne 0 ]; then
                      print_v e "Problem rebasing '$new_backing_file' from '$parent_backing_file' to '$new_parent_backing_file'. Exit code: \n$command_output"
@@ -197,7 +204,7 @@ function consolidate_domain() {
    local command_output=
    local parent_backing_file=
 
-   local block_devices=$(virsh -r domblklist "$domain_name" | awk '/^vd[a-z]\s+/ {print $2}')
+   local block_devices=$($VIRSH -r domblklist "$domain_name" | awk '/^vd[a-z]\s+/ {print $2}')
    _ret=$?
    if [ $_ret -ne 0 ]; then
       print_v e "Error getting block device list for domain '$domain_name'"
@@ -210,12 +217,12 @@ function consolidate_domain() {
    for block_device in "$block_devices"; do
       print_v d "Consolidation of block device: '$block_device' for '$domain_name'"
 
-      backing_file=$(qemu-img info "$block_device" | awk '/^backing file/ { print $3 }')
+      backing_file=$($QEMU_IMG info "$block_device" | awk '/^backing file: / { print $3 }')
       if [ -n "$backing_file" ]; then
          print_v d "Parent block device: '$backing_file'"
 
          # Consolidate the block device
-         command_output=$(virsh -q blockpull "$domain_name" "$block_device" --wait --verbose 2>&1)
+         command_output=$($VIRSH -q blockpull "$domain_name" "$block_device" --wait --verbose 2>&1)
          _ret=$?
          if [ $_ret -eq 0 ]; then
             print_v v "Consolidation of block device '$block_device' for '$domain_name' successful"
@@ -235,7 +242,7 @@ function consolidate_domain() {
                print_v w "'$backing_file' doesn't seem to be a backup backing file image. Stopping backing file chain removal (manual intervetion requested)..."
                break
             fi
-            parent_backing_file=$(qemu-img info "$backing_file" | awk '/^backing file/ { print $3 }')
+            parent_backing_file=$($QEMU_IMG info "$backing_file" | awk '/^backing file: / { print $3 }')
             _ret=$?
             if [ $_ret -eq 0 ]; then
                print_v v "Deleting backing file '$backing_file'"
@@ -267,22 +274,22 @@ function dependencies_check() {
    local patch_release=
    local version=
 
-   if [ -z "$(which virsh)" ]; then
-      print_v e "'virsh' cannot be found"
+   if [ ! -x "$VIRSH" ]; then
+      print_v e "'$VIRSH' cannot be found or executed"
       _ret=1
    fi
 
-   if [ -z "$(which qemu-img)" ]; then
-      print_v e "'qemu-img' cannot be found'"
+   if [ ! -x "$QEMU_IMG" ]; then
+      print_v e "'$QEMU_IMG' cannot be found or executed"
       _ret=1
    fi
 
-   if [ -z "$(which kvm)" ]; then
-      print_v e "'kvm' cannot be found'"
+   if [ ! -x "$KVM" ]; then
+      print_v e "'$KVM' cannot be found or executed"
       _ret=1
    fi
 
-   version=$(virsh -v)
+   version=$($VIRSH -v)
    major_release=$(echo $version | cut -d'.' -f 1)
    minor_release=$(echo $version | cut -d'.' -f 2)
    patch_release=$(echo $version | cut -d'.' -f 3)
@@ -293,13 +300,13 @@ function dependencies_check() {
       _ret=2
    fi
 
-   version=$(qemu-img -h | awk '/qemu-img version / { print $3 }' | cut -d',' -f1)
+   version=$($QEMU_IMG -h | awk '/qemu-img version / { print $3 }' | cut -d',' -f1)
    major_release=$(echo $version | cut -d'.' -f 1)
    minor_release=$(echo $version | cut -d'.' -f 2)
    if [ $major_release -ge 1 -a $minor_release -ge 2 ]; then
-      print_v d "qemu-img version '$version' is supported"
+      print_v d "$QEMU_IMG version '$version' is supported"
    else
-      print_v e "Unsupported qemu-img version '$version'. Please use qemu-img 1.2.0 or greather"
+      print_v e "Unsupported $QEMU_IMG version '$version'. Please use 'qemu-img' 1.2.0 or greather"
       _ret=2
    fi
 
@@ -373,7 +380,7 @@ fi
 
 DOMAINS=
 if [ $DOMAIN_NAME == "all" ]; then
-   DOMAINS=$(virsh -r list | tail -n+3 | awk '{print $2;}')
+   DOMAINS=$($VIRSH -r list | tail -n+3 | awk '{print $2;}')
 else
    DOMAINS=$DOMAIN_NAME
 fi
