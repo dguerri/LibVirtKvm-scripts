@@ -99,7 +99,7 @@ After some more backups, the content of the original directory is the following:
     -rw------- 1 libvirt-qemu kvm      786432 May 31  2013 /nfs/original-dir/DGuerri_Domain.bimg-20130531-125701
     -rw------- 1 libvirt-qemu kvm     3604480 May 31  2013 /nfs/original-dir/DGuerri_Domain.bimg-20130531-125719
 
-And here is the content fo the backup directory:
+And here is the content for the backup directory:
 
     ~# ls /nfs/backup-dir/fi-backups/DGuerri_Domain/DGuerri_Domain* -latr
     -rw------- 1 root root 64108953600 May 31 12:56 /nfs/backup-dir/fi-backups/DGuerri_Domain/DGuerri_Domain.img
@@ -166,7 +166,7 @@ For instance, in order to recover the backup with timestamp `20130531-120054`, t
 * Start a feature/bugfix branch.
 * Commit and push until you are happy with your contribution.
 * Make sure to add tests for it. This is important so I don't break it in a future version unintentionally.
-* Please try not to mess with the Rakefile, version, or history. If you want to have your own version, or is otherwise necessary, that is fine, but please isolate to its own commit so I can cherry-pick around it.
+* Please try not to mess with the version, or history. If you want to have your own version, or is otherwise necessary, that is fine, but please isolate to its own commit so I can cherry-pick around it.
 
 # Copyright
 
