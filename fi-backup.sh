@@ -13,7 +13,7 @@
 # GNU General Public License for more details.
 # 
 # You should have received a copy of the GNU General Public License
-# along with Foobar.  If not, see <http://www.gnu.org/licenses/>. 
+# along with fi-backup.  If not, see <http://www.gnu.org/licenses/>. 
 #
 # fi-backup v1.1 - Online Forward Incremental Libvirt/KVM backup
 # Copyright (C) 2013 Davide Guerri - davide.guerri@gmail.com
