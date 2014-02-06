@@ -99,7 +99,7 @@ After some more backups, the content of the original directory is the following:
     -rw------- 1 libvirt-qemu kvm      786432 May 31  2013 /nfs/original-dir/DGuerri_Domain.bimg-20130531-125701
     -rw------- 1 libvirt-qemu kvm     3604480 May 31  2013 /nfs/original-dir/DGuerri_Domain.bimg-20130531-125719
 
-And here is the content fo the backup directory:
+And here is the content for the backup directory:
 
     ~# ls /nfs/backup-dir/fi-backups/DGuerri_Domain/DGuerri_Domain* -latr
     -rw------- 1 root root 64108953600 May 31 12:56 /nfs/backup-dir/fi-backups/DGuerri_Domain/DGuerri_Domain.img
