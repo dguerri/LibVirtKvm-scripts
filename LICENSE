@@ -1,5 +1,5 @@
 fi-backup - Forward Incremental Backup for Libvirt/KVM VMs
-Copyright (C) 2013 Davide Guerri - Unidata S.p.A. - <davide.guerri@gmail.com>
+Copyright (C) 2014 Davide Guerri - Unidata S.p.A. - <davide.guerri@gmail.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
