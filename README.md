@@ -170,7 +170,7 @@ For instance, in order to recover the backup with timestamp `20130531-120054`, t
 
 # Copyright
 
-Copyright (C) 2013 Davide Guerri - Unidata S.p.A. - <davide.guerri@gmail.com>
+Copyright (C) 2014 Davide Guerri - Unidata S.p.A. - <davide.guerri@gmail.com>
 See LICENSE.txt for further details.
 
 
