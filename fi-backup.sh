@@ -16,7 +16,7 @@
 # along with fi-backup.  If not, see <http://www.gnu.org/licenses/>. 
 #
 # fi-backup v1.1 - Online Forward Incremental Libvirt/KVM backup
-# Copyright (C) 2013 Davide Guerri - davide.guerri@gmail.com
+# Copyright (C) 2014 Davide Guerri - davide.guerri@gmail.com
 #
 
 # Executables
