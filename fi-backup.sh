@@ -99,6 +99,16 @@ function unlock() {
    exec 29>&-
 }
 
+# return 0 if program version is equal or greater than check version
+function check_version()
+{
+    local version=$1 check=$2
+    local winner=$(echo -e "$version\n$check" | sed '/^$/d' | sort -nr | head -1)
+    [[ "$winner" = "$version" ]] && return 0
+    return 1
+}
+
+
 # Function: snapshot_domain()
 # Take a snapshot of all block devices of a domain
 #
@@ -131,12 +141,12 @@ function snapshot_domain() {
       print_v v "Snapshot for block devices of '$domain_name' successful"
 
       if [ -n "$BACKUP_DIRECTORY" -a ! -d "$BACKUP_DIRECTORY" ]; then
-         print_v e "Backup directory '' doesn't exists"
+         print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exists"
          return 1
       fi
       if [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
          # TODO: Check if the following works even if the HD is not a virtio device (i.e. vd[a-z])
-         block_devices=$($VIRSH -r domblklist "$domain_name" | awk '/^vd[a-z]\s+/ {print $2}')
+         block_devices=$($VIRSH -r domblklist "$domain_name" | awk '/^vd[a-z][[:space:]]+/ {print $2}')
          _ret=$?
          if [ $_ret -ne 0 ]; then
             print_v e "Error getting block device list for domain '$domain_name'"
@@ -204,7 +214,7 @@ function consolidate_domain() {
    local command_output=
    local parent_backing_file=
 
-   local block_devices=$($VIRSH -r domblklist "$domain_name" | awk '/^vd[a-z]\s+/ {print $2}')
+   local block_devices=$($VIRSH -r domblklist "$domain_name" | awk '/^vd[a-z][[:space:]]+/ {print $2}')
    _ret=$?
    if [ $_ret -ne 0 ]; then
       print_v e "Error getting block device list for domain '$domain_name'"
@@ -269,9 +279,6 @@ function consolidate_domain() {
 # Dependencies check
 function dependencies_check() {
    local _ret=0
-   local major_release=
-   local minor_release=
-   local patch_release=
    local version=
 
    if [ ! -x "$VIRSH" ]; then
@@ -290,10 +297,7 @@ function dependencies_check() {
    fi
 
    version=$($VIRSH -v)
-   major_release=$(echo $version | cut -d'.' -f 1)
-   minor_release=$(echo $version | cut -d'.' -f 2)
-   patch_release=$(echo $version | cut -d'.' -f 3)
-   if [ $major_release -ge 0 -a $minor_release -ge 9 -a $patch_release -ge 13 ]; then
+   if check_version $version '0.9.13'; then
       print_v d "libVirt version '$version' is supported"
    else
       print_v e "Unsupported libVirt version '$version'. Please use libVirt 0.9.13 or greather"
@@ -301,9 +305,7 @@ function dependencies_check() {
    fi
 
    version=$($QEMU_IMG -h | awk '/qemu-img version / { print $3 }' | cut -d',' -f1)
-   major_release=$(echo $version | cut -d'.' -f 1)
-   minor_release=$(echo $version | cut -d'.' -f 2)
-   if [ $major_release -ge 1 -a $minor_release -ge 2 ]; then
+   if check_version $version '1.2.0'; then
       print_v d "$QEMU_IMG version '$version' is supported"
    else
       print_v e "Unsupported $QEMU_IMG version '$version'. Please use 'qemu-img' 1.2.0 or greather"
@@ -311,9 +313,7 @@ function dependencies_check() {
    fi
 
    version=$(kvm --version | awk '/^QEMU emulator version / { print $4 }')
-   major_release=$(echo $version | cut -d'.' -f 1)
-   minor_release=$(echo $version | cut -d'.' -f 2)
-   if [ $major_release -ge 1 -a $minor_release -ge 2 ]; then
+   if check_version $version '1.2.0'; then
       print_v d "KVM version '$version' is supported"
    else
       print_v e "Unsupported KVM version '$version'. Please use KVM 1.2.0 or greather"
