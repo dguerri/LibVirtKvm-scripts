@@ -1,5 +1,12 @@
 # LibVirtKvm-Scripts
 
+## Apparmor
+
+Please note that in some cases, apparmor will prevent this script from working as it uses the `virsh create-snapshot` command.
+On some distribution (e.g. Ubuntu Precise) this command fails to create external snapshot with apparmor enabled.
+
+See this [bug report](https://bugs.launchpad.net/ubuntu/+source/libvirt/+bug/1004606) for more information and for a workaround.
+
 ## fi-backup - Online Forward Incremental Backup for Libvirt/KVM VMs
 
 fi-backup can be used to make ***online*** _forward incremental_ backup of libvirt/KVM virtual machines.
