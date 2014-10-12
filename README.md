@@ -29,7 +29,7 @@ See sample usage below for more information.
 #### _Forward incremental_ backup of a virtual machine with one disk
 
     ~# mkdir -p /nfs/backup-dir/fi-backups/DGuerri_Domain
-  
+
     ~# ./fi-backup.sh -b /nfs/backup-dir/fi-backups/DGuerri_Domain -d DGuerri_Domain
     [DEB] libVirt version '0.9.13' is supported
     [DEB] qemu-img version '1.2.0' is supported
@@ -41,7 +41,7 @@ See sample usage below for more information.
     [VER] Copy backing file '/nfs/original-dir/DGuerri_Domain.img' to '/nfs/backup-dir/fi-backups/DGuerri_Domain/DGuerri_Domain.img'
     [VER] No parent backing file for '/nfs/original-dir/DGuerri_Domain.img'
 
-The original images directory content after this backup is shown below. 
+The original images directory content after this backup is shown below.
 
     ~# ls /nfs/original-dir/DGuerri_Domain* -latr
     -rw------- 1 libvirt-qemu kvm 64108953600 May 31  2013 /nfs/original-dir/DGuerri_Domain.img
@@ -71,7 +71,7 @@ Some time later, another backup is made:
     [DEB] Parent backing file: '/nfs/original-dir/DGuerri_Domain.img'
     [VER] Changing original backing file reference for '/nfs/backup-dir/fi-backups/DGuerri_Domain/DGuerri_Domain.bimg-20130531-114338' from '/nfs/original-dir/DGuerri_Domain.img' to '/nfs/backup-dir/fi-backups/DGuerri_Domain/DGuerri_Domain.img'
 
-The original images directory content after this backup is shown below. 
+The original images directory content after this backup is shown below.
 
     ~# ls /nfs/original-dir/DGuerri_Domain* - -latr
     -rw------- 1 libvirt-qemu kvm 64108953600 May 31  2013 /nfs/original-dir/DGuerri_Domain.img
@@ -134,10 +134,10 @@ Consolidation example:
     [VER] Deleting backing file '/nfs/original-dir/DGuerri_Domain.bimg-20130531-114338'
     [DEB] Next file in backing file chain: '/nfs/original-dir/DGuerri_Domain.img'
     [DEB] Processing old backing file '/nfs/original-dir/DGuerri_Domain.img' for 'DGuerri_Domain'
-    [WAR] '/nfs/original-dir/DGuerri_Domain.img' doesn't seem to be a backup backing file image. Stopping backing file chain removal (manual intervetion requested)...
+    [WAR] '/nfs/original-dir/DGuerri_Domain.img' doesn't seem to be a backup backing file image. Stopping backing file chain removal (manual intervetion required)...
 
 The last error occours because the filename `DGuerri_Domain.img` doesn't have `bimg-<timestamp>` suffix. In this particular case, we can safely remove this file.
-  
+
     ~# ls /nfs/original-dir/DGuerri_Domain.* -la
     -rw------- 1 libvirt-qemu kvm 64108953600 May 31  2013 /nfs/original-dir/DGuerri_Domain.bimg-20130531-125719
     -rw------- 1 libvirt-qemu kvm 64108953600 May 31 12:40 /nfs/original-dir/DGuerri_Domain.img
@@ -159,7 +159,7 @@ For instance, in order to recover the backup with timestamp `20130531-120054`, t
 * `DGuerri_Domain.bimg-20130531-120054`
 
 # Contributing to LibVirtKvm-Scripts
- 
+
 * Check out the latest master to make sure the feature hasn't been implemented or the bug hasn't been fixed yet.
 * Check out the issue tracker to make sure someone already hasn't requested it and/or contributed it.
 * Fork the project.

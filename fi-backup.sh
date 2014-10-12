@@ -1,19 +1,19 @@
 #!/bin/bash
 #
 # This file is part of fi-backup.
-# 
+#
 # fi-backup is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # fi-backup is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
-# along with fi-backup.  If not, see <http://www.gnu.org/licenses/>. 
+# along with fi-backup.  If not, see <http://www.gnu.org/licenses/>.
 #
 # fi-backup v1.1 - Online Forward Incremental Libvirt/KVM backup
 # Copyright (C) 2014 Davide Guerri - davide.guerri@gmail.com
@@ -248,7 +248,7 @@ function consolidate_domain() {
                print_v v "Deleting backing file '$backing_file'"
                rm "$backing_file"
                if [ $? -ne 0 ]; then
-                  print_v w "Cannot delete '$backing_file'! Stopping backing file chain removal (manual intervetion requested)..."
+                  print_v w "Cannot delete '$backing_file'! Stopping backing file chain removal (manual intervetion required)..."
                   break
                fi
             else
