@@ -2,7 +2,7 @@
 
 ## Apparmor
 
-Please note that in some cases, apparmor will prevent this script from working as it uses the `virsh create-snapshot` command.
+Please note that in some cases, apparmor will prevent this script from working as `fi-backup.sh` uses the `virsh create-snapshot` command.
 On some distribution (e.g. Ubuntu Precise) this command fails to create external snapshot with apparmor enabled.
 
 See this [bug report](https://bugs.launchpad.net/ubuntu/+source/libvirt/+bug/1004606) for more information and for a workaround.
