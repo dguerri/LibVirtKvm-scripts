@@ -312,7 +312,7 @@ function dependencies_check() {
       _ret=2
    fi
 
-   version=$(kvm --version | awk '/^QEMU emulator version / { print $4 }')
+   version=$($KVM --version | awk '/^QEMU emulator version / { print $4 }')
    if check_version $version '1.2.0'; then
       print_v d "KVM version '$version' is supported"
    else
