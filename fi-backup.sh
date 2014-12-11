@@ -145,8 +145,7 @@ function snapshot_domain() {
          return 1
       fi
       if [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
-         # TODO: Check if the following works even if the HD is not a virtio device (i.e. vd[a-z])
-         block_devices=$($VIRSH -r domblklist "$domain_name" | awk '/^vd[a-z][[:space:]]+/ {print $2}')
+         block_devices=$($VIRSH -r domblklist "$domain_name" | awk '/^[shv]d[a-z][[:space:]]+/ {print $2}')
          _ret=$?
          if [ $_ret -ne 0 ]; then
             print_v e "Error getting block device list for domain '$domain_name'"
@@ -312,7 +311,7 @@ function dependencies_check() {
       _ret=2
    fi
 
-   version=$(kvm --version | awk '/^QEMU emulator version / { print $4 }')
+   version=$($KVM --version | awk '/^QEMU emulator version / { print $4 }')
    if check_version $version '1.2.0'; then
       print_v d "KVM version '$version' is supported"
    else
