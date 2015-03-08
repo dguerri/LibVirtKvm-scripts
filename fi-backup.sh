@@ -379,7 +379,7 @@ fi
 
 DOMAINS=
 if [ $DOMAIN_NAME == "all" ]; then
-   DOMAINS=$($VIRSH -r list | tail -n+3 | awk '{print $2;}')
+   DOMAINS=$($VIRSH -q -r list | awk '{print $2;}')
 else
    DOMAINS=$DOMAIN_NAME
 fi
