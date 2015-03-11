@@ -145,7 +145,7 @@ function snapshot_domain() {
          return 1
       fi
       if [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
-         block_devices=$($VIRSH -q -r domblklist "$domain_name" | awk '{print $2}')
+         block_devices=$($VIRSH -q -r domblklist "$domain_name" --details | awk '"disk"==$2 {print $4}')
          _ret=$?
          if [ $_ret -ne 0 ]; then
             print_v e "Error getting block device list for domain '$domain_name'"
@@ -213,7 +213,7 @@ function consolidate_domain() {
    local command_output=
    local parent_backing_file=
 
-   local block_devices=$($VIRSH -q -r domblklist "$domain_name" | awk '/^vd[a-z][[:space:]]+/ {print $2}')
+   local block_devices=$($VIRSH -q -r domblklist "$domain_name" --details | awk '"disk"==$2 {print $4}')
    _ret=$?
    if [ $_ret -ne 0 ]; then
       print_v e "Error getting block device list for domain '$domain_name'"
