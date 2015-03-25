@@ -141,7 +141,7 @@ function snapshot_domain() {
       print_v v "Snapshot for block devices of '$domain_name' successful"
 
       if [ -n "$BACKUP_DIRECTORY" -a ! -d "$BACKUP_DIRECTORY" ]; then
-         print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exists"
+         print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exist"
          return 1
       fi
       if [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
@@ -171,7 +171,7 @@ function snapshot_domain() {
                   print_v d "Parent backing file: '$parent_backing_file'"
                   new_parent_backing_file=$BACKUP_DIRECTORY/$(basename $parent_backing_file)
                   if [ ! -f $new_parent_backing_file ]; then
-                     print_v w "Backing file for current snapshot doesn't exists in '$BACKUP_DIRECTORY'!"
+                     print_v w "Backing file for current snapshot doesn't exist in '$BACKUP_DIRECTORY'!"
                   fi
 
                   print_v v "Changing original backing file reference for '$new_backing_file' from '$parent_backing_file' to '$new_parent_backing_file'"
@@ -327,7 +327,7 @@ while getopts "b:cCdhv" opt; do
       b)
          BACKUP_DIRECTORY=$OPTARG
          if [ ! -d "$BACKUP_DIRECTORY" ]; then
-            print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exists!"
+            print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exist!"
             exit 1
          fi
       ;;
