@@ -173,14 +173,6 @@ function snapshot_domain() {
                   if [ ! -f $new_parent_backing_file ]; then
                      print_v w "Backing file for current snapshot doesn't exist in '$BACKUP_DIRECTORY'!"
                   fi
-
-                  print_v v "Changing original backing file reference for '$new_backing_file' from '$parent_backing_file' to '$new_parent_backing_file'"
-                  command_output=$($QEMU_IMG rebase -u -b "$new_parent_backing_file" "$new_backing_file")
-                  _ret=$?
-                  if [ $_ret -ne 0 ]; then
-                     print_v e "Problem rebasing '$new_backing_file' from '$parent_backing_file' to '$new_parent_backing_file'. Exit code: \n$command_output"
-                     continue
-                  fi
                else
                   print_v v "No parent backing file for '$backing_file'"
                fi
