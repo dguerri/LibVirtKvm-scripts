@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This file is part of fi-backup.
 #
@@ -15,17 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with fi-backup.  If not, see <http://www.gnu.org/licenses/>.
 #
-# fi-backup v1.1 - Online Forward Incremental Libvirt/KVM backup
-# Copyright (C) 2014 Davide Guerri - davide.guerri@gmail.com
+# fi-backup v1.5 - Online Forward Incremental Libvirt/KVM backup
+# Copyright (C) 2013 2014 2015 Davide Guerri - davide.guerri@gmail.com
 #
+
+# Fail if one process fails in a pipe
+set -o pipefail
 
 # Executables
 QEMU_IMG="/usr/bin/qemu-img"
 VIRSH="/usr/bin/virsh"
-KVM="/usr/bin/kvm"
-if [ -x "/usr/bin/qemu-kvm" ]; then
-   KVM="/usr/bin/qemu-kvm"
-fi
+QEMU="/usr/bin/qemu-system-x86_64"
 
 # Defaults and constants
 BACKUP_DIRECTORY=
@@ -58,7 +58,7 @@ function print_v() {
 }
 
 function print_usage() {
-   [ -n "$1" ] && print_v e $1
+   [ -n "$1" ] && print_v e "$1"
 
    cat <<EOU
 
@@ -81,7 +81,7 @@ EOU
 function try_lock() {
    local domain_name=$1
 
-   exec 29>/var/lock/$domain_name.fi-backup.lock
+   exec 29>"/var/lock/$domain_name.fi-backup.lock"
 
    flock -n 29
 
@@ -95,7 +95,7 @@ function try_lock() {
 function unlock() {
    local domain_name=$1
 
-   rm /var/lock/$domain_name.fi-backup.lock
+   rm "/var/lock/$domain_name.fi-backup.lock"
    exec 29>&-
 }
 
@@ -108,6 +108,44 @@ function check_version()
     return 1
 }
 
+# Function: get_block_devices()
+# Return the list of block devices of a domain. This function correctly handles
+# paths with spaces.
+#
+# Input:    Domain name
+# Output:   An array containing a block device list
+# Return:   0 on success, non 0 otherwise
+function get_block_devices() {
+   local domain_name=$1 return_var=$2
+   local _ret=
+
+   eval "$return_var=()"
+
+   while IFS= read -r file; do
+      eval "$return_var+=('$file')"
+   done < <($VIRSH -q -r domblklist "$domain_name" --details|awk '"disk"==$2 {$1=$2=$3=""; print $0}'|sed 's/^[ \t]*//')
+
+   return 0
+}
+
+# Function: get_backing_file()
+# Return the immediate parent of a qcow2 image file (i.e. the backing file)
+#
+# Input:    qcow2 image file name
+# Output:   A backing file name
+# Return:   0 on success, non 0 otherwise
+function get_backing_file() {
+   local file_name=$1 return_var=$2
+   local _ret=
+   local _backing_file=
+
+   _backing_file=$($QEMU_IMG info "$file_name"|awk '/^backing file: / {$1=$2=""; print $0}'|sed 's/^[ \t]*//')
+   _ret=$?
+
+   eval "$return_var=\"$_backing_file\""
+
+   return $_ret
+}
 
 # Function: snapshot_domain()
 # Take a snapshot of all block devices of a domain
@@ -145,23 +183,25 @@ function snapshot_domain() {
          return 1
       fi
       if [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
-         block_devices=$($VIRSH -q -r domblklist "$domain_name" --details | awk '"disk"==$2 {print $4}')
+         get_block_devices "$domain_name" block_devices
          _ret=$?
          if [ $_ret -ne 0 ]; then
             print_v e "Error getting block device list for domain '$domain_name'"
             return $_ret
          fi
 
-         for block_device in "$block_devices"; do
-            backing_file=$($QEMU_IMG info "$block_device" | awk '/^backing file: / { print $3 }')
+         for ((i = 0; i < ${#block_devices[@]}; i++)); do
+            block_device="${block_devices[$i]}"
+            get_backing_file "$block_device" backing_file
 
             if [ -f "$backing_file" ]; then
-               new_backing_file="$BACKUP_DIRECTORY/$(basename $backing_file)"
+               backing_file_base=$(basename "$backing_file")
+               new_backing_file="$BACKUP_DIRECTORY/$backing_file_base"
 
                print_v v "Copy backing file '$backing_file' to '$new_backing_file'"
                cp "$backing_file" "$new_backing_file"
 
-               parent_backing_file=$($QEMU_IMG info "$backing_file" | awk '/^backing file: / { print $3 }')
+               get_backing_file "$backing_file" parent_backing_file
                _ret=$?
                if [ $_ret -ne 0 ]; then
                   print_v e "Problem getting backing file for '$backing_file'"
@@ -169,8 +209,9 @@ function snapshot_domain() {
                fi
                if [ -n "$parent_backing_file" ]; then
                   print_v d "Parent backing file: '$parent_backing_file'"
-                  new_parent_backing_file=$BACKUP_DIRECTORY/$(basename $parent_backing_file)
-                  if [ ! -f $new_parent_backing_file ]; then
+                  parent_backing_file_base=$(basename "$parent_backing_file")
+                  new_parent_backing_file="$BACKUP_DIRECTORY/$parent_backing_file_base"
+                  if [ ! -f "$new_parent_backing_file" ]; then
                      print_v w "Backing file for current snapshot doesn't exist in '$BACKUP_DIRECTORY'!"
                   fi
                else
@@ -205,7 +246,8 @@ function consolidate_domain() {
    local command_output=
    local parent_backing_file=
 
-   local block_devices=$($VIRSH -q -r domblklist "$domain_name" --details | awk '"disk"==$2 {print $4}')
+   local block_devices=''
+   get_block_devices "$domain_name" block_devices
    _ret=$?
    if [ $_ret -ne 0 ]; then
       print_v e "Error getting block device list for domain '$domain_name'"
@@ -213,12 +255,13 @@ function consolidate_domain() {
    fi
 
    print_v d "Consolidation of block devices for '$domain_name' requested"
-   print_v d "Block devices to be consolidated:\n $(echo $block_devices | sed 's/ /\\n/g')"
+   print_v d "Block devices to be consolidated:\n\t${block_devices[@]}"
 
-   for block_device in "$block_devices"; do
+   for ((i = 0; i < ${#block_devices[@]}; i++)); do
+      block_device="${block_devices[$i]}"
       print_v d "Consolidation of block device: '$block_device' for '$domain_name'"
 
-      backing_file=$($QEMU_IMG info "$block_device" | awk '/^backing file: / { print $3 }')
+      get_backing_file "$block_device" backing_file
       if [ -n "$backing_file" ]; then
          print_v d "Parent block device: '$backing_file'"
 
@@ -238,29 +281,34 @@ function consolidate_domain() {
             print_v d "Processing old backing file '$backing_file' for '$domain_name'"
 
             # Check if this is a backup backing file...
-            echo $backing_file | grep -q "\.$SNAPSHOT_PREFIX-[0-9]\{8\}\-[0-9]\{6\}$"
+            echo "$backing_file" | grep -q "\.$SNAPSHOT_PREFIX-[0-9]\{8\}\-[0-9]\{6\}$"
             if [ $? -ne 0 ]; then
-               print_v w "'$backing_file' doesn't seem to be a backup backing file image. Stopping backing file chain removal (manual intervetion requested)..."
+               print_v w "'$backing_file' doesn't seem to be a backup backing file image."
+               print_v w "Stopping backing file chain removal (manual intervetion might be required)"
+               print_v w "This is expected if this is the first consolidation"
                break
             fi
-            parent_backing_file=$($QEMU_IMG info "$backing_file" | awk '/^backing file: / { print $3 }')
+
+            get_backing_file "$backing_file" parent_backing_file
             _ret=$?
+            print_v d "Parent backing file: '$parent_backing_file'"
             if [ $_ret -eq 0 ]; then
                print_v v "Deleting backing file '$backing_file'"
                rm "$backing_file"
                if [ $? -ne 0 ]; then
-                  print_v w "Cannot delete '$backing_file'! Stopping backing file chain removal (manual intervetion required)..."
+                  print_v w "Cannot delete '$backing_file'!"
+                  print_v w "Stopping backing file chain removal (manual intervetion required)"
                   break
                fi
             else
                print_v e "Problem getting backing file for '$backing_file'"
                break
             fi
-            backing_file=$parent_backing_file
+            backing_file="$parent_backing_file"
             print_v d "Next file in backing file chain: '$parent_backing_file'"
          done
       else
-         print_v w "No backing file found for '$block_device'. Nothing to do."
+         print_v d "No backing file found for '$block_device'. Nothing to do."
       fi
    done
 
@@ -282,13 +330,13 @@ function dependencies_check() {
       _ret=1
    fi
 
-   if [ ! -x "$KVM" ]; then
-      print_v e "'$KVM' cannot be found or executed"
+   if [ ! -x "$QEMU" ]; then
+      print_v e "'$QEMU' cannot be found or executed"
       _ret=1
    fi
 
    version=$($VIRSH -v)
-   if check_version $version '0.9.13'; then
+   if check_version "$version" '0.9.13'; then
       print_v d "libVirt version '$version' is supported"
    else
       print_v e "Unsupported libVirt version '$version'. Please use libVirt 0.9.13 or greather"
@@ -296,15 +344,15 @@ function dependencies_check() {
    fi
 
    version=$($QEMU_IMG -h | awk '/qemu-img version / { print $3 }' | cut -d',' -f1)
-   if check_version $version '1.2.0'; then
+   if check_version "$version" '1.2.0'; then
       print_v d "$QEMU_IMG version '$version' is supported"
    else
       print_v e "Unsupported $QEMU_IMG version '$version'. Please use 'qemu-img' 1.2.0 or greather"
       _ret=2
    fi
 
-   version=$($KVM --version | awk '/^QEMU emulator version / { print $4 }')
-   if check_version $version '1.2.0'; then
+   version=$($QEMU --version | awk '/^QEMU emulator version / { print $4 }')
+   if check_version "$version" '1.2.0'; then
       print_v d "KVM version '$version' is supported"
    else
       print_v e "Unsupported KVM version '$version'. Please use KVM 1.2.0 or greather"
@@ -370,7 +418,7 @@ if [ -z "$DOMAIN_NAME" ]; then
 fi
 
 DOMAINS=
-if [ $DOMAIN_NAME == "all" ]; then
+if [ "$DOMAIN_NAME" == "all" ]; then
    DOMAINS=$($VIRSH -q -r list | awk '{print $2;}')
 else
    DOMAINS=$DOMAIN_NAME
@@ -379,22 +427,22 @@ fi
 for DOMAIN in $DOMAINS; do
    _ret=0
    if [ $SNAPSHOT -eq 1 ]; then
-      try_lock $DOMAIN
+      try_lock "$DOMAIN"
       if [ $? -eq 0 ]; then
-         snapshot_domain $DOMAIN
+         snapshot_domain "$DOMAIN"
          _ret=$?
-         unlock $DOMAIN
+         unlock "$DOMAIN"
       else
          print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping backup of '$DOMAIN'"
       fi
    fi
 
    if [ $_ret -eq 0 -a $CONSOLIDATION -eq 1 ]; then
-      try_lock $DOMAIN
+      try_lock "$DOMAIN"
       if [ $? -eq 0 ]; then
-         consolidate_domain $DOMAIN
+         consolidate_domain "$DOMAIN"
          _ret=$?
-         unlock $DOMAIN
+         unlock "$DOMAIN"
       else
          print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping consolidation of '$DOMAIN'"
       fi

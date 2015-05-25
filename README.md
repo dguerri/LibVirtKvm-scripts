@@ -1,11 +1,22 @@
 # LibVirtKvm-Scripts
 
+**Status**
+* [![Build Status](https://travis-ci.org/dguerri/LibVirtKvm-scripts.svg?branch=master)](https://travis-ci.org/dguerri/LibVirtKvm-scripts) on master branch
+* [![Build Status](https://travis-ci.org/dguerri/LibVirtKvm-scripts.svg?branch=development)](https://travis-ci.org/dguerri/LibVirtKvm-scripts) on development branch
+
 ## Apparmor
 
-Please note that in some cases, apparmor will prevent this script from working as `fi-backup.sh` uses the `virsh create-snapshot` command.
-On some distribution (e.g. Ubuntu Precise) this command fails to create external snapshot with apparmor enabled.
+Please note that in some cases, **apparmor prevents this script from working**:
+
+`fi-backup.sh` uses the `virsh create-snapshot` command. On some distribution (e.g. Ubuntu) this command fails to create external snapshot with apparmor enabled.
 
 See this [bug report](https://bugs.launchpad.net/ubuntu/+source/libvirt/+bug/1004606) for more information and for a workaround.
+
+*Quick and dirty workaround*
+
+Edit `/etc/libvirt/qemu.conf` and set
+
+    security_driver = "none"
 
 ## fi-backup - Online Forward Incremental Backup for Libvirt/KVM VMs
 
@@ -34,6 +45,7 @@ See sample usage below for more information.
 ### Sample usage
 
 #### _Forward incremental_ backup of a virtual machine with one disk
+(output might be slightly different depending on the version used)
 
     ~# mkdir -p /nfs/backup-dir/fi-backups/DGuerri_Domain
 
@@ -177,7 +189,7 @@ For instance, in order to recover the backup with timestamp `20130531-120054`, t
 
 # Copyright
 
-Copyright (C) 2014 Davide Guerri - <davide.guerri@gmail.com>
+Copyright (C) 2013 2014 2015 Davide Guerri - <davide.guerri@gmail.com>
 See LICENSE.txt for further details.
 
 
