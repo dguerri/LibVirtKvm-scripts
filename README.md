@@ -36,20 +36,30 @@ Edit `/etc/libvirt/qemu.conf` and set
 
     security_driver = "none"
 
+## Dependencies
+
+`fi-backup.sh` is designed to run on GNU/Linux. The following software is also required:
+
+* libVirt >= 0.9.13
+* QEMU/KVM >= 1.2.0
+
 ### Syntax
+
+    fi-backup version 2.0.0 - by Davide Guerri <davide.guerri@gmail.com>
 
     Usage:
 
-      ./fi-backup.sh [-c|-C] [-q] [-h] [-d] [-v] [-b <directory>] <domain name>|all
+    ./fi-backup.sh [-c|-C] [-q] [-h] [-d] [-v] [-V] [-b <directory>] <domain name>|all
 
     Options
-       -b <directory>    Copy previous snapshot/base image to the specified <directory>
-       -c                Consolidation only
-       -C                Snapshot and consolidation
-       -q                Use quiescence
-       -d                Debug
-       -h                Print usage and exit
-       -v                Verbose
+      -b <directory>    Copy previous snapshot/base image to the specified <directory>
+      -c                Consolidation only
+      -C                Snapshot and consolidation
+      -q                Use quiescence (qemu agent must be installed in the domain)
+      -d                Debug
+      -h                Print usage and exit
+      -v                Verbose
+      -V                Print version and exit
 
 ### Sample usage
 

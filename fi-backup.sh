@@ -20,6 +20,7 @@
 #
 
 VERSION="2.0.0"
+APP_NAME="fi-backup"
 
 # Fail if one process fails in a pipe
 set -o pipefail
@@ -64,11 +65,11 @@ function print_usage() {
    [ -n "$1" ] && print_v e "$1"
 
    cat <<EOU
-   $0 version $VERSION - by Davide Guerri <davide.guerri@gmail.com>
+   $APP_NAME version $VERSION - by Davide Guerri <davide.guerri@gmail.com>
 
    Usage:
 
-   $0 [-V] [-c|-C] [-q] [-h] [-d] [-v] [-b <directory>] <domain name>|all
+   $0 [-c|-C] [-q] [-h] [-d] [-v] [-V] [-b <directory>] <domain name>|all
 
    Options
       -b <directory>    Copy previous snapshot/base image to the specified <directory>
@@ -424,7 +425,7 @@ while getopts "b:cCqdhvV" opt; do
          VERBOSE=1
       ;;
       V)
-         echo "$0 version $VERSION"
+         echo "$APP_NAME version $VERSION"
          exit 0
       ;;
       \?)
