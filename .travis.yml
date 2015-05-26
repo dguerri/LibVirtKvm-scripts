@@ -1,0 +1,77 @@
+---
+language: python
+python: "2.7"
+
+install:
+  # Install dependencies
+  - sudo add-apt-repository -y "deb http://mirrors.kernel.org/ubuntu utopic main universe"
+  - sudo apt-get -y update
+  - sudo apt-get install -y libvirt-bin virtinst shellcheck
+
+  # Configure libvirt
+  - sudo sh -c 'echo "security_driver = \"none\"" >> /etc/libvirt/qemu.conf'
+  - sudo service libvirt-bin restart
+
+  # Download cirros image and setup disks
+  - >
+    wget --no-check-certificate
+    https://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+    -O /tmp/cirros.img
+  - mkdir /tmp/test\ disks /tmp/backup\ dir
+  - cp /tmp/cirros.img /tmp/test\ disks/test1\ 1.img
+  - cp /tmp/cirros.img /tmp/test\ disks/test2\ 1.img
+  - cp /tmp/cirros.img /tmp/test\ disks/test2\ 2.img
+
+  # Create VMS
+  - >
+    sudo virt-install --connect qemu:///system --os-type linux
+    --os-variant generic --debug --import --name t1d --ram 512 --vcpus 1
+    --noautoconsole --nographics --virt-type qemu --nonetworks
+    --disk path=/tmp/test\ disks/test1\ 1.img,device=disk,format=qcow2
+
+  - >
+    sudo virt-install --connect qemu:///system --os-type linux
+    --os-variant generic --debug --import --name t2d --ram 512 --vcpus=1
+    --noautoconsole --nographics --virt-type qemu --nonetworks
+    --disk path=/tmp/test\ disks/test2\ 1.img,device=disk,format=qcow2
+    --disk path=/tmp/test\ disks/test2\ 2.img,device=disk,format=qcow2
+
+script:
+  # Check fi-backup.sh syntax
+  - shellcheck fi-backup.sh
+
+  # Test1 1 disk, spaces in filenames
+  ## 1st Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t1d
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t1d
+  ### Consolidate
+  - sudo ./fi-backup.sh -dc t1d
+  ## 2nd Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t1d
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t1d
+  ### Consolidate
+  - sudo ./fi-backup.sh -dc t1d
+
+  # Test2 2 disks, spaces in filenames
+  ## 1st Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
+  ### Consolidate
+  - sudo ./fi-backup.sh -dc t2d
+  ## 2nd Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
+  ### Consolidate
+  - sudo ./fi-backup.sh -dc t2d
