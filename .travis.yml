@@ -75,3 +75,39 @@ script:
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
   ### Consolidate
   - sudo ./fi-backup.sh -dc t2d
+
+  # Test3 all domains
+  ## 1st Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  ### Consolidate
+  - sudo ./fi-backup.sh -dc all
+  ## 2nd Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  ### Consolidate
+  - sudo ./fi-backup.sh -dc all
+
+  # Test4 all domains, snapshot + consolidate
+  ## 1st Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  ### Consolidate
+  - sudo ./fi-backup.sh -dC all
+  ## 2nd Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  ### Consolidate
+  - sudo ./fi-backup.sh -dC all
