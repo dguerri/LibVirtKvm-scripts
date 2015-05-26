@@ -1,0 +1,87 @@
+Forward incremental Backup
+--------------------------
+
+Initial configuration. "Current image" pointer is an abstraction for the image currently used by qemu to run a given domain.
+
+      Current image
+            |
+            v
+    +-----------------+
+    |   disk.qcow2    |
+    +-----------------+
+
+Run `fi-backup`.
+
+                                 Current image
+                                       |
+                                       v
+    +------------------+   +-------------------------+
+    |    disk.qcow2    |<--| disk.qcow2-<timestamp1> |
+    +------------------+   +-------------------------+
+
+
+After the first run, `disk.qcow2` is the backing file of `disk.qcow2-<timestamp1>`. That means that `disk.qcow2` is used in read-only mode by qemu. Thus, it can be safely copied to perform our backup.
+
+
+                                                               Current image
+                                                                     |
+                                                                     v
+    +------------------+   +-------------------------+   +-------------------------+
+    |    disk.qcow2    |<--| disk.qcow2-<timestamp1> |<--| disk.qcow2-<timestamp2> |
+    +------------------+   +-------------------------+   +-------------------------+
+
+After the second run, `disk.qcow2` has not changed, so we can just copy `disk.qcow2-<timestamp1>` to our backup storage.
+This is the "key" of forward incremental backup: `disk.qcow2-<timestamp1>` contains just the deltas since the first `fi-backup` run.
+
+
+Consolidation
+-------------
+
+Consolidation copies the content of backing files into the current image, allowing us to remove them.
+This reduces the number of image files, reduces the size of disk images and improves domain performances.
+
+                                                               Current image
+                                                                     |
+                                                                     v
+    +------------------+   +-------------------------+   +-------------------------+
+    |    disk.qcow2    |<--| disk.qcow2-<timestamp1> |<--| disk.qcow2-<timestamp2> |
+    +------------------+   +-------------------------+   +-------------------------+
+
+
+Running in consolidation mode will "copy" backing images content back into the current image.
+
+                                                              Current image
+                                            +-----bpull----+        |
+                                            |              v        v
+    +---------------+   +-------------------------+   +-------------------------+
+    |  disk.qcow2   |<--| disk.qcow2-<timestamp1> | X | disk.qcow2-<timestamp2> |
+    +---------------+   +-------------------------+   +-------------------------+
+
+After that, old backing files can be deleted.
+
+           Current image
+                 |
+                 v
+    +-------------------------+
+    | disk.qcow2-<timestamp2> |
+    +-------------------------+
+
+
+Restore
+-------
+
+Restore procedure for a domain A, with images in directory B, backup directory C is the following. Thanks to [svorobyov](https://github.com/svorobyov) for these steps.
+
+1. clean up the directory B from all images for domain A;
+2. copy the desired chains of the backing images for domain A from C to B (although it is not recommended, chains can be of different lengths, e.g., recover disk 1 to the state two days back and disk 2 to the state three days);
+3. specify (using `virsh`, `virt-manager`, `virt-install`, ...) that the disks for A are the last images of the chains in 2 (this is important, otherwise the VM state description may be inconsistent)
+4. optionally, consolidate for domain A (which will use chains of images in B)
+
+Note
+----
+
+In general, even if the qcow2 image format is guaranteed to be consistent, the contained filesystem(s) will not.
+In order to perform consistent backups we can use 2 different strategies (neither of which are currently implemented in `fi-backup.sh`):
+
+1. use domain quiescence. Adding --quiescence to `snapshot-create-as` command in `snapshot_domain()`. This requires configuring the domain to use quiescence;
+2. pause the domain and dump its state (i.e., CPU registries and RAM content) before creating the snapshot. Restart the domain right afterward and copy the domain state along with disk images.

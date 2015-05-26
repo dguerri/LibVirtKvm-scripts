@@ -4,6 +4,17 @@
 * [![Build Status](https://travis-ci.org/dguerri/LibVirtKvm-scripts.svg?branch=master)](https://travis-ci.org/dguerri/LibVirtKvm-scripts) on master branch
 * [![Build Status](https://travis-ci.org/dguerri/LibVirtKvm-scripts.svg?branch=development)](https://travis-ci.org/dguerri/LibVirtKvm-scripts) on development branch
 
+## fi-backup - Online Forward Incremental Backup for Libvirt/KVM VMs
+
+fi-backup can be used to make ***online*** _forward incremental_ backup of libvirt/KVM virtual machines.
+It works on VMs with multiple disks but only if disk images are in qcow2 format.
+It also allows consolidation of backups previously taken. Both backup and consolidation can be performed live, on running domains.
+
+Please note that the integrity of these backup is not assured because fi-backup only performs backup of VMs disks (CPU status and RAM aren't saved).
+
+See sample usage below for more information.
+For more information about how backups are performed, see [Nuts and Bolts of fi-backup](NUTSNBOLTS.md)
+
 ## Apparmor
 
 Please note that in some cases, **apparmor prevents this script from working**:
@@ -17,16 +28,6 @@ See this [bug report](https://bugs.launchpad.net/ubuntu/+source/libvirt/+bug/100
 Edit `/etc/libvirt/qemu.conf` and set
 
     security_driver = "none"
-
-## fi-backup - Online Forward Incremental Backup for Libvirt/KVM VMs
-
-fi-backup can be used to make ***online*** _forward incremental_ backup of libvirt/KVM virtual machines.
-It works on VMs with multiple disks but only if disk images are in qcow2 format.
-It also allows consolidation of backups previously taken.
-
-Please note that the integrity of these backup is not assured because fi-backup only performs backup of VMs disks (CPU status and RAM aren't saved).
-
-See sample usage below for more information.
 
 ### Syntax
 
