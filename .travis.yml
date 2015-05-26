@@ -101,13 +101,16 @@ script:
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - sleep 2
   ### Consolidate
   - sudo ./fi-backup.sh -dC all
+  - sleep 2
   ## 2nd Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - sleep 2
   ### Consolidate
   - sudo ./fi-backup.sh -dC all

@@ -15,9 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with fi-backup.  If not, see <http://www.gnu.org/licenses/>.
 #
-# fi-backup v1.5 - Online Forward Incremental Libvirt/KVM backup
+# fi-backup - Online Forward Incremental Libvirt/KVM backup
 # Copyright (C) 2013 2014 2015 Davide Guerri - davide.guerri@gmail.com
 #
+
+VERSION="2.0.0"
 
 # Fail if one process fails in a pipe
 set -o pipefail
@@ -31,6 +33,7 @@ QEMU="/usr/bin/qemu-system-x86_64"
 BACKUP_DIRECTORY=
 CONSOLIDATION=0
 DEBUG=0
+QUIESCE=0
 SNAPSHOT=1
 SNAPSHOT_PREFIX="bimg"
 VERBOSE=0
@@ -61,18 +64,21 @@ function print_usage() {
    [ -n "$1" ] && print_v e "$1"
 
    cat <<EOU
+   $0 version $VERSION - by Davide Guerri <davide.guerri@gmail.com>
 
    Usage:
 
-   $0 [-c|-C] [-h] [-d] [-v] [-b <directory>] <domain name>|all
+   $0 [-V] [-c|-C] [-q] [-h] [-d] [-v] [-b <directory>] <domain name>|all
 
    Options
       -b <directory>    Copy previous snapshot/base image to the specified <directory>
       -c                Consolidation only
       -C                Snapshot and consolidation
+      -q                Use quiescence (qemu agent must be installed in the domain)
       -d                Debug
       -h                Print usage and exit
       -v                Verbose
+      -V                Print version and exit
 
 EOU
 }
@@ -159,6 +165,7 @@ function snapshot_domain() {
    local backing_file=
    local block_device=
    local block_devices=
+   local extra_args=
    local command_output=
    local new_backing_file=
    local new_parent_backing_file=
@@ -172,7 +179,10 @@ function snapshot_domain() {
    # Create an external snapshot for each block device
    print_v d "Snapshotting block devices for '$domain_name' using suffix '$SNAPSHOT_PREFIX-$timestamp'"
 
-   command_output=$($VIRSH -q snapshot-create-as "$domain_name" "$SNAPSHOT_PREFIX-$timestamp" --no-metadata --disk-only --atomic 2>&1)
+   if [ $QUIESCE -eq 1 ]; then
+      extra_args="--quiesce"
+   fi
+   command_output=$($VIRSH -q snapshot-create-as "$domain_name" "$SNAPSHOT_PREFIX-$timestamp" --no-metadata --disk-only --atomic $extra_args 2>&1)
    _ret=$?
 
    if [ $_ret -eq 0 ]; then
@@ -362,7 +372,7 @@ function dependencies_check() {
    return $_ret
 }
 
-while getopts "b:cCdhv" opt; do
+while getopts "b:cCqdhvV" opt; do
    case $opt in
       b)
          BACKUP_DIRECTORY=$OPTARG
@@ -376,6 +386,10 @@ while getopts "b:cCdhv" opt; do
             print_usage "-c or -C already specified!"
             exit 1
          fi
+         if [ $QUIESCE -eq 1 ]; then
+            print_usage "-q and -c are not compatible"
+            exit 1
+         fi
          CONSOLIDATION=1
          SNAPSHOT=0
       ;;
@@ -384,8 +398,19 @@ while getopts "b:cCdhv" opt; do
             print_usage "-c or -C already specified!"
             exit 1
          fi
+         if [ $QUIESCE -eq 1 ]; then
+            print_usage "-q and -c are not compatible"
+            exit 1
+         fi
          CONSOLIDATION=1
          SNAPSHOT=1
+      ;;
+      q)
+         if [ $CONSOLIDATION -eq 1 ]; then
+            print_usage "-q and -c are not compatible"
+            exit 1
+         fi
+         QUIESCE=1
       ;;
       d)
          DEBUG=1
@@ -397,6 +422,10 @@ while getopts "b:cCdhv" opt; do
       ;;
       v)
          VERBOSE=1
+      ;;
+      V)
+         echo "$0 version $VERSION"
+         exit 0
       ;;
       \?)
          echo "Invalid option: -$OPTARG" >&2

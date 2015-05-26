@@ -10,7 +10,14 @@ fi-backup can be used to make ***online*** _forward incremental_ backup of libvi
 It works on VMs with multiple disks but only if disk images are in qcow2 format.
 It also allows consolidation of backups previously taken. Both backup and consolidation can be performed live, on running domains.
 
-Please note that the integrity of these backup is not assured because fi-backup only performs backup of VMs disks (CPU status and RAM aren't saved).
+Note
+----
+
+`fi-backup.sh` guarantees that qcow2 images format is consistent, but this doesn't imply that the contained filesystems are consistent too.
+In order to perform consistent backups it is possible to use 2 different strategies:
+
+1. use domain quiescence. This is implemented in `fi-backup.sh` (-q option, see below) but requires configuring the domain to use quiescence (e.g. `apt-get install qemu-guest-agent` inside VM);
+2. pause the domain and dump its state (i.e., CPU registries and RAM content) before creating the snapshot. Restart the domain right afterward snapshot creation and copy the domain state along with disk images (not currently implemented).
 
 See sample usage below for more information.
 For more information about how backups are performed, see [Nuts and Bolts of fi-backup](NUTSNBOLTS.md)
@@ -33,12 +40,13 @@ Edit `/etc/libvirt/qemu.conf` and set
 
     Usage:
 
-      ./fi-backup.sh [-c|-C] [-h] [-d] [-v] [-b <directory>] <domain name>|all
+      ./fi-backup.sh [-c|-C] [-q] [-h] [-d] [-v] [-b <directory>] <domain name>|all
 
     Options
        -b <directory>    Copy previous snapshot/base image to the specified <directory>
        -c                Consolidation only
        -C                Snapshot and consolidation
+       -q                Use quiescence
        -d                Debug
        -h                Print usage and exit
        -v                Verbose
