@@ -8,30 +8,30 @@ Initial configuration. "Current image" pointer is an abstraction for the image c
             v
     +-----------------+
     |   disk.qcow2    |
-    +-----------------+
+    +-----------(R/W)-+
 
 Run `fi-backup`.
 
                                  Current image
                                        |
                                        v
-    +------------------+   +-------------------------+
-    |    disk.qcow2    |<--| disk.qcow2-<timestamp1> |
-    +------------------+   +-------------------------+
+    +------------------+   +------------------------+
+    |    disk.qcow2    |<--| disk.bimg-<timestamp1> |
+    +------------(R/O)-+   +------------------(R/W)-+
 
 
-After the first run, `disk.qcow2` is the backing file of `disk.qcow2-<timestamp1>`. That means that `disk.qcow2` is used in read-only mode by qemu. Thus, it can be safely copied to perform our backup.
+After the first run, `disk.qcow2` is the backing file of `disk.bimg-<timestamp1>`. That means that `disk.qcow2` is used in read-only mode by qemu. Thus, it can be safely copied to perform our backup.
 
 
                                                                Current image
                                                                      |
                                                                      v
-    +------------------+   +-------------------------+   +-------------------------+
-    |    disk.qcow2    |<--| disk.qcow2-<timestamp1> |<--| disk.qcow2-<timestamp2> |
-    +------------------+   +-------------------------+   +-------------------------+
+    +------------------+   +------------------------+   +------------------------+
+    |    disk.qcow2    |<--| disk.bimg-<timestamp1> |<--| disk.bimg-<timestamp2> |
+    +------------(R/O)-+   +------------------(R/O)-+   +------------------(R/W)-+
 
-After the second run, `disk.qcow2` has not changed, so we can just copy `disk.qcow2-<timestamp1>` to our backup storage.
-This is the "key" of forward incremental backup: `disk.qcow2-<timestamp1>` contains just the deltas since the first `fi-backup` run.
+After the second run, `disk.qcow2` has not changed, so we can just copy `disk.bimg-<timestamp1>` to our backup storage.
+This is the "key" of forward incremental backup: `disk.bimg-<timestamp1>` contains just the deltas since the first `fi-backup` run.
 
 
 Consolidation
@@ -43,28 +43,30 @@ This reduces the number of image files, reduces the size of disk images and impr
                                                                Current image
                                                                      |
                                                                      v
-    +------------------+   +-------------------------+   +-------------------------+
-    |    disk.qcow2    |<--| disk.qcow2-<timestamp1> |<--| disk.qcow2-<timestamp2> |
-    +------------------+   +-------------------------+   +-------------------------+
+    +------------------+   +------------------------+   +------------------------+
+    |    disk.qcow2    |<--| disk.bimg-<timestamp1> |<--| disk.bimg-<timestamp2> |
+    +------------(R/O)-+   +------------------(R/O)-+   +------------------(R/W)-+
 
 
 Running in consolidation mode will "copy" backing images content back into the current image.
 
                                                               Current image
-                                            +-----bpull----+        |
-                                            |              v        v
-    +---------------+   +-------------------------+   +-------------------------+
-    |  disk.qcow2   |<--| disk.qcow2-<timestamp1> | X | disk.qcow2-<timestamp2> |
-    +---------------+   +-------------------------+   +-------------------------+
+                                            +--block-pull--+        |
+                                            |              |        v
+    +------------------+   +----------------+-------+   +--v---------------------+
+    |    disk.qcow2    |<--| disk.bimg-<timestamp1> | X | disk.bimg-<timestamp2> |
+    +-----------(R/O)--+   +------------------(R/O)-+   +------------------(R/W)-+
 
 After that, old backing files can be deleted.
+`fi-backup.sh` will automatically delete every old backing file with extension `bimg-<timestampX>`. In the example above, `disk.qcow2` will not be automatically deleted and a warining is printed.
+It is safe to manually delete `disk.qcow2`, as the only image needed after the consolidation is `disk.bimg-<timestamp2>`:
 
            Current image
                  |
                  v
-    +-------------------------+
-    | disk.qcow2-<timestamp2> |
-    +-------------------------+
+    +------------------------+
+    | disk.bimg-<timestamp2> |
+    +------------------(R/W)-+
 
 
 Restore
