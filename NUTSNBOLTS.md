@@ -79,11 +79,3 @@ Restore procedure for a domain A, with images in directory B, backup directory C
 3. specify (using `virsh`, `virt-manager`, `virt-install`, ...) that the disks for A are the last images of the chains in 2 (this is important, otherwise the VM state description may be inconsistent)
 4. optionally, consolidate for domain A (which will use chains of images in B)
 
-Note
-----
-
-In general, even if the qcow2 image format is guaranteed to be consistent, the contained filesystem(s) will not.
-In order to perform consistent backups we can use 2 different strategies (neither of which are currently implemented in `fi-backup.sh`):
-
-1. use domain quiescence. Adding --quiescence to `snapshot-create-as` command in `snapshot_domain()`. This requires configuring the domain to use quiescence;
-2. pause the domain and dump its state (i.e., CPU registries and RAM content) before creating the snapshot. Restart the domain right afterward and copy the domain state along with disk images.
