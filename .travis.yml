@@ -18,6 +18,7 @@ install:
     https://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
     -O /tmp/cirros.img
   - mkdir /tmp/test\ disks /tmp/backup\ dir
+  - sudo chmod 0777 /tmp/backup\ dir
   - cp /tmp/cirros.img /tmp/test\ disks/test1\ 1.img
   - cp /tmp/cirros.img /tmp/test\ disks/test2\ 1.img
   - cp /tmp/cirros.img /tmp/test\ disks/test2\ 2.img
@@ -36,6 +37,8 @@ install:
     --disk path=/tmp/test\ disks/test2\ 1.img,device=disk,format=qcow2
     --disk path=/tmp/test\ disks/test2\ 2.img,device=disk,format=qcow2
 
+  - sudo virsh list --all
+
 script:
   # Check fi-backup.sh syntax
   - shellcheck fi-backup.sh
@@ -44,17 +47,27 @@ script:
   ## 1st Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t1d
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t1d
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
   ### Consolidate
   - sudo ./fi-backup.sh -dc t1d
   ## 2nd Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t1d
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t1d
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
   ### Consolidate
   - sudo ./fi-backup.sh -dc t1d
 
@@ -62,24 +75,34 @@ script:
   ## 1st Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
   ### Consolidate
   - sudo ./fi-backup.sh -dc t2d
   ## 2nd Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir t2d
   ### Consolidate
   - sudo ./fi-backup.sh -dc t2d
+  - sleep 2
 
   # Test3 all domains
   ## 1st Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
@@ -88,29 +111,87 @@ script:
   ## 2nd Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
   ### Consolidate
   - sudo ./fi-backup.sh -dc all
+  - sleep 2
 
   # Test4 all domains, snapshot + consolidate
   ## 1st Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Consolidate
   - sudo ./fi-backup.sh -dC all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ## 2nd Backup
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Backup
   - sudo ./fi-backup.sh -d -b /tmp/backup\ dir all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
   - sleep 2
   ### Consolidate
   - sudo ./fi-backup.sh -dC all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
+
+  # Test5 all domains, dump state, snapshot, consolidate
+  ## 1st Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -s /tmp/backup\ dir -b /tmp/backup\ dir all
+  - sudo virsh list --all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -s /tmp/backup\ dir -b /tmp/backup\ dir all
+  - sudo virsh list --all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
+  ### Consolidate
+  - sudo ./fi-backup.sh -dc all
+  - sudo virsh list --all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
+  ## 2nd Backup
+  ### Backup
+  - sudo ./fi-backup.sh -d -s /tmp/backup\ dir -b /tmp/backup\ dir all
+  - sudo virsh list --all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
+  ### Backup
+  - sudo ./fi-backup.sh -d -s /tmp/backup\ dir -b /tmp/backup\ dir all
+  - sudo virsh list --all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks
+  - sleep 2
+  ### Consolidate
+  - sudo ./fi-backup.sh -dc all
+  - sudo virsh list --all
+  - ls -la /tmp/backup\ dir
+  - ls -la /tmp/test\ disks

@@ -79,3 +79,9 @@ Restore procedure for a domain A, with images in directory B, backup directory C
 3. specify (using `virsh`, `virt-manager`, `virt-install`, ...) that the disks for A are the last images of the chains in 2 (this is important, otherwise the VM state description may be inconsistent)
 4. optionally, consolidate for domain A (which will use chains of images in B)
 
+Restore of backup with domain state dump can be performed
+
+TBW
+`<qemu-command-line> -incoming "exec: gzip -c -d <path/to/state/file>"`
+
+

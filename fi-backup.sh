@@ -19,7 +19,7 @@
 # Copyright (C) 2013 2014 2015 Davide Guerri - davide.guerri@gmail.com
 #
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 APP_NAME="fi-backup"
 
 # Fail if one process fails in a pipe
@@ -34,10 +34,13 @@ QEMU="/usr/bin/qemu-system-x86_64"
 BACKUP_DIRECTORY=
 CONSOLIDATION=0
 DEBUG=0
+VERBOSE=0
 QUIESCE=0
+DUMP_STATE=0
 SNAPSHOT=1
 SNAPSHOT_PREFIX="bimg"
-VERBOSE=0
+DUMP_STATE_TIMEOUT=60
+DUMP_STATE_DIRECTORY=
 
 function print_v() {
    local level=$1
@@ -49,7 +52,7 @@ function print_v() {
       d) # Debug
       [ $DEBUG -eq 1 ] && echo -e "[DEB] ${*:2}"
       ;;
-      e) # Verbose
+      e) # Error
       echo -e "[ERR] ${*:2}"
       ;;
       w) # Warning
@@ -62,20 +65,21 @@ function print_v() {
 }
 
 function print_usage() {
-   [ -n "$1" ] && print_v e "$1"
+   [ -n "$1" ] && (echo "" ; print_v e "$1\n")
 
    cat <<EOU
-   $APP_NAME version $VERSION - by Davide Guerri <davide.guerri@gmail.com>
+   $APP_NAME version $VERSION - Davide Guerri <davide.guerri@gmail.com>
 
    Usage:
 
-   $0 [-c|-C] [-q] [-h] [-d] [-v] [-V] [-b <directory>] <domain name>|all
+   $0 [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] <domain name>|all
 
    Options
       -b <directory>    Copy previous snapshot/base image to the specified <directory>
       -c                Consolidation only
       -C                Snapshot and consolidation
       -q                Use quiescence (qemu agent must be installed in the domain)
+      -s <directory>    Dump domain status in the specified directory
       -d                Debug
       -h                Print usage and exit
       -v                Verbose
@@ -84,7 +88,8 @@ function print_usage() {
 EOU
 }
 
-# Mutual exclusion management: only one instance of this script can be running at one time.
+# Mutual exclusion management: only one instance of this script can be running
+# at one time.
 function try_lock() {
    local domain_name=$1
 
@@ -110,14 +115,15 @@ function unlock() {
 function check_version()
 {
     local version=$1 check=$2
-    local winner=$(echo -e "$version\n$check" | sed '/^$/d' | sort -nr | head -1)
+    local winner=$(echo -e "$version\n$check" | sed '/^$/d' | sort -nr | \
+      head -1)
     [[ "$winner" = "$version" ]] && return 0
     return 1
 }
 
 # Function: get_block_devices()
-# Return the list of block devices of a domain. This function correctly handles
-# paths with spaces.
+# Return the list of block devices of a domain. This function correctly
+# handles paths with spaces.
 #
 # Input:    Domain name
 # Output:   An array containing a block device list
@@ -130,7 +136,8 @@ function get_block_devices() {
 
    while IFS= read -r file; do
       eval "$return_var+=('$file')"
-   done < <($VIRSH -q -r domblklist "$domain_name" --details|awk '"disk"==$2 {$1=$2=$3=""; print $0}'|sed 's/^[ \t]*//')
+   done < <($VIRSH -q -r domblklist "$domain_name" --details|awk \
+      '"disk"==$2 {$1=$2=$3=""; print $0}'|sed 's/^[ \t]*//')
 
    return 0
 }
@@ -146,12 +153,76 @@ function get_backing_file() {
    local _ret=
    local _backing_file=
 
-   _backing_file=$($QEMU_IMG info "$file_name"|awk '/^backing file: / {$1=$2=""; print $0}'|sed 's/^[ \t]*//')
+   _backing_file=$($QEMU_IMG info "$file_name" | \
+      awk '/^backing file: / {$1=$2=""; print $0}'|sed 's/^[ \t]*//')
    _ret=$?
 
    eval "$return_var=\"$_backing_file\""
 
    return $_ret
+}
+
+# Function: dump_state()
+# Dump a domain state, pausing the domain right afterwards
+#
+# Input:    a domain name
+# Input:    a timestamp (this will be added to the file name)
+# Return:   0 on success, non 0 otherwise
+function dump_state() {
+   local domain_name=$1
+   local timestamp=$2
+
+   local _ret=
+   local _timeout=
+
+   local _dump_state_filename="$DUMP_STATE_DIRECTORY/$domain_name.statefile-$timestamp.gz"
+
+   local output=$($VIRSH qemu-monitor-command "$domain_name" '{"execute": "migrate", "arguments": {"uri": "exec:gzip -c > ' "'$_dump_state_filename'" '"}}' 2>&1)
+   if [ $? -ne 0 ]; then
+      print_v e "Failed to dump domain state: '$output'"
+      return 1
+   fi
+
+   _timeout=5
+   print_v d "Waiting for dump file '$_dump_state_filename' to be created"
+   while [ ! -f "$_dump_state_filename" ]; do
+      _timeout=$((_timeout - 1))
+      if [ "$_timeout" -eq 0 ]; then
+         print_v e "Timeout while waiting for dump file to be created"
+         return 4
+      fi
+      sleep 1
+      print_v d "Still waiting for dump file '$_dump_state_filename' to be created ($_timeout)"
+   done
+   print_v d "Dump file '$_dump_state_filename' created"
+
+   if [ ! -f "$_dump_state_filename" ]; then
+      print_v e "Dump file not created ('$_dump_state_filename'), something went wrong! ('$output' ?)"
+      return 1
+   fi
+
+   _timeout="$DUMP_STATE_TIMEOUT"
+   print_v d "Waiting for '$domain_name' to be paused"
+   while true; do
+      output=$(virsh domstate "$domain_name")
+      if [ $? -ne 0 ]; then
+         print_v e "Failed to check domain state"
+         return 2
+      fi
+      if [ "$output" == "paused" ]; then
+         print_v d "Domain paused!"
+         break
+      fi
+      if [ "$_timeout" -eq 0 ]; then
+         print_v e "Timeout while waiting for VM to pause: '$output'"
+         return 3
+      fi
+      print_v d "Still waiting for '$domain_name' to be paused ($_timeout)"
+      sleep 1
+      _timeout=$((_timeout - 1))
+   done
+
+   return 0
 }
 
 # Function: snapshot_domain()
@@ -162,7 +233,7 @@ function get_backing_file() {
 function snapshot_domain() {
    local domain_name=$1
 
-   local _ret=
+   local _ret=0
    local backing_file=
    local block_device=
    local block_devices=
@@ -173,79 +244,110 @@ function snapshot_domain() {
    local parent_backing_file=
 
    local timestamp=$(date "+%Y%m%d-%H%M%S")
+   local resume_vm=0
 
    print_v d "Snapshot for domain '$domain_name' requested"
    print_v d "Using timestamp '$timestamp'"
+
+   # Dump VM state
+   if [ "$DUMP_STATE" -eq 1 ]; then
+      print_v v "Dumping domain state"
+      dump_state "$domain_name" "$timestamp"
+      if [ $? -ne 0 ]; then
+         print_v e \
+         "Domain state dump failed!"
+         return 1
+      else
+         resume_vm=1
+         # Should something go wrong, resume the domain
+         trap 'virsh resume "$domain_name" >/dev/null 2>&1' SIGINT SIGTERM
+      fi
+   fi
 
    # Create an external snapshot for each block device
    print_v d "Snapshotting block devices for '$domain_name' using suffix '$SNAPSHOT_PREFIX-$timestamp'"
 
    if [ $QUIESCE -eq 1 ]; then
+      print_v d "Quiesce requested"
       extra_args="--quiesce"
    fi
-   command_output=$($VIRSH -q snapshot-create-as "$domain_name" "$SNAPSHOT_PREFIX-$timestamp" --no-metadata --disk-only --atomic $extra_args 2>&1)
-   _ret=$?
 
-   if [ $_ret -eq 0 ]; then
+   command_output=$($VIRSH -q snapshot-create-as "$domain_name" \
+      "$SNAPSHOT_PREFIX-$timestamp" --no-metadata --disk-only --atomic \
+      $extra_args 2>&1)
+   if [ $? -eq 0 ]; then
       print_v v "Snapshot for block devices of '$domain_name' successful"
 
       if [ -n "$BACKUP_DIRECTORY" -a ! -d "$BACKUP_DIRECTORY" ]; then
          print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exist"
-         return 1
-      fi
-      if [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
+         _ret=1
+      elif [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
          get_block_devices "$domain_name" block_devices
-         _ret=$?
-         if [ $_ret -ne 0 ]; then
-            print_v e "Error getting block device list for domain '$domain_name'"
-            return $_ret
-         fi
+         if [ $? -ne 0 ]; then
+            print_v e "Error getting block device list for domain \
+            '$domain_name'"
+            _ret=1
+         else
+            for ((i = 0; i < ${#block_devices[@]}; i++)); do
+               block_device="${block_devices[$i]}"
+               get_backing_file "$block_device" backing_file
 
-         for ((i = 0; i < ${#block_devices[@]}; i++)); do
-            block_device="${block_devices[$i]}"
-            get_backing_file "$block_device" backing_file
+               if [ -f "$backing_file" ]; then
+                  backing_file_base=$(basename "$backing_file")
+                  new_backing_file="$BACKUP_DIRECTORY/$backing_file_base"
 
-            if [ -f "$backing_file" ]; then
-               backing_file_base=$(basename "$backing_file")
-               new_backing_file="$BACKUP_DIRECTORY/$backing_file_base"
+                  print_v v \
+                     "Copy backing file '$backing_file' to '$new_backing_file'"
+                  cp "$backing_file" "$new_backing_file"
 
-               print_v v "Copy backing file '$backing_file' to '$new_backing_file'"
-               cp "$backing_file" "$new_backing_file"
-
-               get_backing_file "$backing_file" parent_backing_file
-               _ret=$?
-               if [ $_ret -ne 0 ]; then
-                  print_v e "Problem getting backing file for '$backing_file'"
-                  continue
-               fi
-               if [ -n "$parent_backing_file" ]; then
-                  print_v d "Parent backing file: '$parent_backing_file'"
-                  parent_backing_file_base=$(basename "$parent_backing_file")
-                  new_parent_backing_file="$BACKUP_DIRECTORY/$parent_backing_file_base"
-                  if [ ! -f "$new_parent_backing_file" ]; then
-                     print_v w "Backing file for current snapshot doesn't exist in '$BACKUP_DIRECTORY'!"
+                  get_backing_file "$backing_file" parent_backing_file
+                  if [ $? -ne 0 ]; then
+                     print_v e "Problem getting backing file for '$backing_file'"
+                     continue
+                  fi
+                  if [ -n "$parent_backing_file" ]; then
+                     print_v d "Parent backing file: '$parent_backing_file'"
+                     parent_backing_file_base=$(basename \
+                        "$parent_backing_file")
+                     new_parent_backing_file="$BACKUP_DIRECTORY/$parent_backing_file_base"
+                     if [ ! -f "$new_parent_backing_file" ]; then
+                        print_v w "Backing file for current snapshot doesn't exist in '$BACKUP_DIRECTORY'!"
+                     fi
+                  else
+                     print_v v "No parent backing file for '$backing_file'"
                   fi
                else
-                  print_v v "No parent backing file for '$backing_file'"
+                  print_v e "Error getting backing file for '$block_device'."
+                  _ret=1
                fi
-            else
-               print_v e "Error getting backing file for '$block_device'."
-               return $_ret
-            fi
-         done
+            done
+         fi
       else
          print_v d "No backup directory specified"
       fi
    else
-      print_v e "Snapshot for '$domain_name' failed! Exit code: $_ret\n'$command_output'"
+      print_v e \
+      "Snapshot for '$domain_name' failed! Exit code: $_ret\n'$command_output'"
+      _ret=1
    fi
 
+   if [ "$resume_vm" -eq 1 ]; then
+      print_v d "Resuming domain"
+      virsh resume "$domain_name" >/dev/null 2>&1
+      if [ $? -ne 0 ]; then
+         print_v e "Problem resuming domain '$domain_name'"
+         _ret=1
+      else
+         print_v v "Domain resumed"
+         trap "" SIGINT SIGTERM
+      fi
+   fi
    return $_ret
 }
 
 # Function: consolidate_domain()
 # Consolidate block devices for a domain
-# !!! This function will delete all previous file in the backingfiles chain !!!
+# !!! This function will delete all previous file in the backing file chain !!!
 #
 # Input:    Domain name
 # Return:   0 on success, non 0 otherwise
@@ -259,10 +361,9 @@ function consolidate_domain() {
 
    local block_devices=''
    get_block_devices "$domain_name" block_devices
-   _ret=$?
-   if [ $_ret -ne 0 ]; then
+   if [ $? -ne 0 ]; then
       print_v e "Error getting block device list for domain '$domain_name'"
-      return $_ret
+      return 1
    fi
 
    print_v d "Consolidation of block devices for '$domain_name' requested"
@@ -270,29 +371,32 @@ function consolidate_domain() {
 
    for ((i = 0; i < ${#block_devices[@]}; i++)); do
       block_device="${block_devices[$i]}"
-      print_v d "Consolidation of block device: '$block_device' for '$domain_name'"
+      print_v d \
+         "Consolidation of block device: '$block_device' for '$domain_name'"
 
       get_backing_file "$block_device" backing_file
       if [ -n "$backing_file" ]; then
          print_v d "Parent block device: '$backing_file'"
 
          # Consolidate the block device
-         command_output=$($VIRSH -q blockpull "$domain_name" "$block_device" --wait --verbose 2>&1)
-         _ret=$?
-         if [ $_ret -eq 0 ]; then
+         command_output=$($VIRSH -q blockpull "$domain_name" "$block_device" \
+            --wait --verbose 2>&1)
+         if [ $? -eq 0 ]; then
             print_v v "Consolidation of block device '$block_device' for '$domain_name' successful"
          else
             print_v e "Error consolidating block device '$block_device' for '$domain_name':\n $command_output"
-            return $_ret
+            return 1
          fi
 
          # Deletes all old block devices
          print_v v "Deleting old backup files for '$domain_name'"
          while [ -n "$backing_file" ]; do
-            print_v d "Processing old backing file '$backing_file' for '$domain_name'"
+            print_v d \
+            "Processing old backing file '$backing_file' for '$domain_name'"
 
             # Check if this is a backup backing file...
-            echo "$backing_file" | grep -q "\.$SNAPSHOT_PREFIX-[0-9]\{8\}\-[0-9]\{6\}$"
+            echo "$backing_file" | grep -q \
+               "\.$SNAPSHOT_PREFIX-[0-9]\{8\}\-[0-9]\{6\}$"
             if [ $? -ne 0 ]; then
                print_v w "'$backing_file' doesn't seem to be a backup backing file image."
                print_v w "Stopping backing file chain removal (manual intervetion might be required)"
@@ -308,7 +412,7 @@ function consolidate_domain() {
                rm "$backing_file"
                if [ $? -ne 0 ]; then
                   print_v w "Cannot delete '$backing_file'!"
-                  print_v w "Stopping backing file chain removal (manual intervetion required)"
+                  print_v w "Stopping backing file chain removal (manual intervetion might be required)"
                   break
                fi
             else
@@ -354,7 +458,8 @@ function dependencies_check() {
       _ret=2
    fi
 
-   version=$($QEMU_IMG -h | awk '/qemu-img version / { print $3 }' | cut -d',' -f1)
+   version=$($QEMU_IMG -h | awk '/qemu-img version / { print $3 }' | \
+      cut -d',' -f1)
    if check_version "$version" '1.2.0'; then
       print_v d "$QEMU_IMG version '$version' is supported"
    else
@@ -373,7 +478,7 @@ function dependencies_check() {
    return $_ret
 }
 
-while getopts "b:cCqdhvV" opt; do
+while getopts "b:cCs:qdhvV" opt; do
    case $opt in
       b)
          BACKUP_DIRECTORY=$OPTARG
@@ -387,10 +492,6 @@ while getopts "b:cCqdhvV" opt; do
             print_usage "-c or -C already specified!"
             exit 1
          fi
-         if [ $QUIESCE -eq 1 ]; then
-            print_usage "-q and -c are not compatible"
-            exit 1
-         fi
          CONSOLIDATION=1
          SNAPSHOT=0
       ;;
@@ -399,19 +500,20 @@ while getopts "b:cCqdhvV" opt; do
             print_usage "-c or -C already specified!"
             exit 1
          fi
-         if [ $QUIESCE -eq 1 ]; then
-            print_usage "-q and -c are not compatible"
-            exit 1
-         fi
          CONSOLIDATION=1
          SNAPSHOT=1
       ;;
       q)
-         if [ $CONSOLIDATION -eq 1 ]; then
-            print_usage "-q and -c are not compatible"
+         QUIESCE=1
+      ;;
+      s)
+         DUMP_STATE=1
+         DUMP_STATE_DIRECTORY=$OPTARG
+         if [ ! -d "$DUMP_STATE_DIRECTORY" ]; then
+            print_v e \
+               "Dump state directory '$DUMP_STATE_DIRECTORY' doesn't exist!"
             exit 1
          fi
-         QUIESCE=1
       ;;
       d)
          DEBUG=1
@@ -435,6 +537,26 @@ while getopts "b:cCqdhvV" opt; do
       ;;
    esac
 done
+
+# Parameters validation
+if [ $CONSOLIDATION -eq 1 ]; then
+   if [ $QUIESCE -eq 1 ]; then
+      print_usage "consolidation (-c | -C) and quiesce (-q) are not compatible"
+      exit 1
+   fi
+   if [ $DUMP_STATE -eq 1 ]; then
+      print_usage \
+         "consolidation (-c | -C) and dump state (-s) are not compatible"
+      exit 1
+   fi
+fi
+
+if [ $DUMP_STATE -eq 1 ]; then
+   if [ $QUIESCE -eq 1 ]; then
+      print_usage "dump state (-s) and quiesce (-q) are not compatible"
+      exit 1
+   fi
+fi
 
 shift $(( OPTIND - 1 ));
 
@@ -479,4 +601,4 @@ for DOMAIN in $DOMAINS; do
    fi
 done
 
-exit 0
+exit $_ret
