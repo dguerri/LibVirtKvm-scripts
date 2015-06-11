@@ -454,7 +454,7 @@ function dependencies_check() {
    if check_version "$version" '0.9.13'; then
       print_v d "libVirt version '$version' is supported"
    else
-      print_v e "Unsupported libVirt version '$version'. Please use libVirt 0.9.13 or greather"
+      print_v e "Unsupported libVirt version '$version'. Please use libVirt 0.9.13 or later"
       _ret=2
    fi
 
@@ -463,7 +463,7 @@ function dependencies_check() {
    if check_version "$version" '1.2.0'; then
       print_v d "$QEMU_IMG version '$version' is supported"
    else
-      print_v e "Unsupported $QEMU_IMG version '$version'. Please use 'qemu-img' 1.2.0 or greather"
+      print_v e "Unsupported $QEMU_IMG version '$version'. Please use 'qemu-img' 1.2.0 or later"
       _ret=2
    fi
 
@@ -471,7 +471,7 @@ function dependencies_check() {
    if check_version "$version" '1.2.0'; then
       print_v d "QEMU/KVM version '$version' is supported"
    else
-      print_v e "Unsupported QEMU/KVM version '$version'. Please use QEMU/KVM 1.2.0 or greather"
+      print_v e "Unsupported QEMU/KVM version '$version'. Please use QEMU/KVM 1.2.0 or later"
       _ret=2
    fi
 
