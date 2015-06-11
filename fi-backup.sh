@@ -452,7 +452,11 @@ function dependencies_check() {
 
    version=$($VIRSH -v)
    if check_version "$version" '0.9.13'; then
-      print_v d "libVirt version '$version' is supported"
+      if check_version "$version" '1.0.0'; then
+         print_v i "libVirt version '$version' support is experimental"
+      else
+         print_v d "libVirt version '$version' is supported"
+      fi
    else
       print_v e "Unsupported libVirt version '$version'. Please use libVirt 0.9.13 or later"
       _ret=2
