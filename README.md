@@ -13,11 +13,14 @@ It also allows consolidation of backups previously taken. Both backup and consol
 Note
 ----
 
-`fi-backup.sh` guarantees that qcow2 images format is consistent, but this doesn't imply that the contained filesystems are consistent too.
-In order to perform consistent backups it is possible to use 2 different strategies:
+By default `fi-backup.sh` guarantees that qcow2 images format is consistent, but this doesn't imply that the contained filesystems are consistent too.
+In order to perform consistent backups, you can use two different strategies:
 
-1. use domain quiescence. This is implemented in `fi-backup.sh` (-q option, see below) but requires configuring the domain to use quiescence (e.g. `apt-get install qemu-guest-agent` inside VM);
-2. pause the domain and dump its state (i.e., CPU registries and RAM content) before creating the snapshot. Restart the domain right afterward snapshot creation and copy the domain state along with disk images (not currently implemented).
+1. use domain quiescence (`-q` option, see below). This requires configuring the domain to use quiescence (e.g. `apt-get install qemu-guest-agent` inside VM);
+2. dump domain state (`-s <directory>` option, see below). In this case the domain is paused, its state is dumped, a snapshot of all its disks is performed and then the domain is restarted.
+
+Option number 2 doesn't require agents installed in the domain, but it will pause the VM for some seconds (the actual number of secords depends on how busy the VM is and the mount of RAM given to the VM).
+For very busy domain, state dump could not complete, expecially if it is done on slow disks (e.g. NFS).
 
 See sample usage below for more information.
 For more information about how backups are performed, see [Nuts and Bolts of fi-backup](NUTSNBOLTS.md)
@@ -45,17 +48,18 @@ Edit `/etc/libvirt/qemu.conf` and set
 
 ### Syntax
 
-    fi-backup version 2.0.0 - by Davide Guerri <davide.guerri@gmail.com>
+   fi-backup version 2.1.0 - Davide Guerri <davide.guerri@gmail.com>
 
-    Usage:
+   Usage:
 
-    ./fi-backup.sh [-c|-C] [-q] [-h] [-d] [-v] [-V] [-b <directory>] <domain name>|all
+   ./fi-backup.sh [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] <domain name>|all
 
-    Options
+   Options
       -b <directory>    Copy previous snapshot/base image to the specified <directory>
       -c                Consolidation only
       -C                Snapshot and consolidation
       -q                Use quiescence (qemu agent must be installed in the domain)
+      -s <directory>    Dump domain status in the specified directory
       -d                Debug
       -h                Print usage and exit
       -v                Verbose
