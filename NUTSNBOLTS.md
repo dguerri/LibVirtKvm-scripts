@@ -58,7 +58,7 @@ Running in consolidation mode will "copy" backing images content back into the c
     +-----------(R/O)--+   +------------------(R/O)-+   +------------------(R/W)-+
 
 After that, old backing files can be deleted.
-`fi-backup.sh` will automatically delete every old backing file with extension `bimg-<timestampX>`. In the example above, `disk.qcow2` will not be automatically deleted and a warining is printed.
+`fi-backup.sh` will automatically delete every old backing file with extension `bimg-<timestampX>`. In the example above, `disk.qcow2` will not be automatically deleted and a warning is printed.
 It is safe to manually delete `disk.qcow2`, as the only image needed after the consolidation is `disk.bimg-<timestamp2>`:
 
            Current image
