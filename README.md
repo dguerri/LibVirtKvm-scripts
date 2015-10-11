@@ -6,7 +6,7 @@
 
 ## fi-backup - Online Forward Incremental Backup for Libvirt/KVM VMs
 
-fi-backup can be used to make ***online*** _forward incremental_ backup of libvirt/KVM virtual machines.
+fi-backup can be used to make offline or online _forward incremental_ backups of libvirt/KVM virtual machines.
 It works on VMs with multiple disks but only if disk images are in qcow2 format.
 It also allows consolidation of backups previously taken. Both backup and consolidation can be performed live, on running domains.
 
@@ -21,6 +21,9 @@ In order to perform consistent backups, you can use two different strategies:
 
 Option number 2 doesn't require agents installed in the domain, but it will pause the VM for some seconds (the actual number of secords depends on how busy the VM is and the mount of RAM given to the VM).
 For very busy domain, state dump could not complete, expecially if it is done on slow disks (e.g. NFS).
+
+Offline backups work by comparing timestamps on the VM images vs the backup timestamps and doing a "cp --update" which only updates
+the backups if the image timestamp is newer than the backup timestamp. 
 
 See sample usage below for more information.
 For more information about how backups are performed, see [Nuts and Bolts of fi-backup](NUTSNBOLTS.md)
@@ -52,7 +55,7 @@ Edit `/etc/libvirt/qemu.conf` and set
 
    Usage:
 
-   ./fi-backup.sh [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] <domain name>|all
+   ./fi-backup.sh [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] <domain names separated by spaces>|all
 
    Options
       -b <directory>    Copy previous snapshot/base image to the specified <directory>
@@ -214,5 +217,3 @@ For instance, in order to recover the backup with timestamp `20130531-120054`, t
 
 Copyright (C) 2013 2014 2015 Davide Guerri - <davide.guerri@gmail.com>
 See LICENSE.txt for further details.
-
-
