@@ -631,7 +631,7 @@ for DOMAIN in $DOMAINS_NOTRUNNING; do
          backing_file=""
          block_device="${block_devices[$i]}"
          print_v d "Backing up: cp -up $backing_file $BACKUP_DIRECTORY/"
-         cp -up $block_device $BACKUP_DIRECTORY/ || print_v e "Unable to cp -up $block_device"
+         cp -up "$block_device" "$BACKUP_DIRECTORY"/ || print_v e "Unable to cp -up $block_device"
          get_backing_file "$block_device" backing_file
          j=0
          all_backing_files[$j]=$backing_file
@@ -641,7 +641,7 @@ for DOMAIN in $DOMAINS_NOTRUNNING; do
             print_v d "Parent block device: '$backing_file'"
             #In theory snapshots are unchanged so we can use one time cp instead of rsync
             print_v d "Backing up: cp -up $backing_file $BACKUP_DIRECTORY/"
-            cp -up $backing_file $BACKUP_DIRECTORY/ || print_v e "Unable to cp -up $backing_file"
+            cp -up "$backing_file" "$BACKUP_DIRECTORY"/ || print_v e "Unable to cp -up $backing_file"
             #get next backing file if it exists
             get_backing_file "$backing_file" parent_backing_file
             print_v d "Next file in backing file chain: '$parent_backing_file'"
