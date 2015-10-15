@@ -4,7 +4,7 @@ python: "2.7"
 
 install:
   # Install dependencies
-  - sudo add-apt-repository -y "deb http://mirrors.kernel.org/ubuntu utopic main universe"
+  - sudo add-apt-repository -y "deb http://mirrors.kernel.org/ubuntu vivid main universe"
   - sudo apt-get -y update
   - sudo apt-get install -y libvirt-bin virtinst shellcheck
 
@@ -43,15 +43,16 @@ script:
   # Check fi-backup.sh syntax
   - shellcheck fi-backup.sh
 
-  # Test0: stop VMs and see if backup works, then restart
+  # Test0: stop VMs and see if offline backup works, then restart domains
   #
-  - virsh --connect qemu:///system shutdown t1d
-  - virsh --connect qemu:///system shutdown t2d
+  - sudo virsh --connect qemu:///system shutdown t1d
+  - sudo virsh --connect qemu:///system shutdown t2d
+  - sleep 2
   - sudo ./fi-backup -d -b /tmp/backup\ dir all
   - ls -la /tmp/backup\ dir/test*
   - sleep 2
-  - virsh --connect qemu:///system start t1d
-  - virsh --connect qemu:///system start t2d
+  - sudo virsh --connect qemu:///system start t1d
+  - sudo virsh --connect qemu:///system start t2d
   - sleep 2
 
   # Test1 1 disk, spaces in filenames
