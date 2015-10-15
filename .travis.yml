@@ -1,13 +1,13 @@
 ---
 language: python
 python: "2.7"
-sudo: required
-dist: trusty
 
 install:
   # Install dependencies
+  - sudo rm /etc/dpkg/dpkg.cfg.d/multiarch
+  - sudo add-apt-repository -y "deb http://mirrors.kernel.org/ubuntu vivid main universe"
   - sudo apt-get -y update
-  - sudo apt-get install -y libvirt-bin virtinst shellcheck
+  - sudo apt-get install -y --force-yes libvirt-bin virtinst shellcheck
 
   # Configure libvirt
   - sudo sh -c 'echo "security_driver = \"none\"" >> /etc/libvirt/qemu.conf'
