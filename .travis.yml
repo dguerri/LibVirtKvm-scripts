@@ -43,6 +43,17 @@ script:
   # Check fi-backup.sh syntax
   - shellcheck fi-backup.sh
 
+  # Test0: stop VMs and see if backup works, then restart
+  #
+  - virsh --connect qemu:///system shutdown t1d
+  - virsh --connect qemu:///system shutdown t2d
+  - sudo ./fi-backup -d -b /tmp/backup\ dir all
+  - ls -la /tmp/backup\ dir/test*
+  - sleep 2
+  - virsh --connect qemu:///system start t1d
+  - virsh --connect qemu:///system start t2d
+  - sleep 2
+
   # Test1 1 disk, spaces in filenames
   ## 1st Backup
   ### Backup
