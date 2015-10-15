@@ -367,7 +367,7 @@ function consolidate_domain() {
    fi
 
    print_v d "Consolidation of block devices for '$domain_name' requested"
-   print_v d "Block devices to be consolidated:\n\t${block_devices[@]}"
+   print_v d "Block devices to be consolidated:\n\t${block_devices[*]}"
 
    for ((i = 0; i < ${#block_devices[@]}; i++)); do
       block_device="${block_devices[$i]}"
@@ -573,23 +573,20 @@ if [ -z "$DOMAIN_NAME" ]; then
    exit 2
 fi
 
-DOMAINS=
 DOMAINS_RUNNING=
 DOMAINS_NOTRUNNING=
 if [ "$DOMAIN_NAME" == "all" ]; then
    DOMAINS_RUNNING=$($VIRSH -q -r list --state-running | awk '{print $2;}')
    DOMAINS_NOTRUNNING=$($VIRSH -q -r list --all --state-shutoff --state-paused | awk '{print $2;}')
-   DOMAINS="$DOMAINS_RUNNING $DOMAINS_NOTRUNNING"
 else
    for THIS_DOMAIN in $DOMAIN_NAME; do
-     DOMAIN_STATE=$($VIRSH -q domstate $THIS_DOMAIN)
+     DOMAIN_STATE=$($VIRSH -q domstate "$THIS_DOMAIN")
      if [ "$DOMAIN_STATE" == running ]; then
        DOMAINS_RUNNING="$DOMAINS_RUNNING $THIS_DOMAIN"
      else 
        DOMAINS_NOTRUNNING="$DOMAINS_NOTRUNNING $THIS_DOMAIN"
      fi
    done
-   DOMAINS="$DOMAINS_RUNNING $DOMAINS_NOTRUNNING"
 fi
 
 print_v d "Domains NOTRUNNING: $DOMAINS_NOTRUNNING"
