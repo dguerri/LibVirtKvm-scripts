@@ -3,8 +3,9 @@ language: python
 python: "2.7"
 
 install:
-  # Install dependencies
+  # Install dependencies - delete files to allow upgrade
   - sudo rm /etc/dpkg/dpkg.cfg.d/multiarch
+  - sudo rm /etc/default/rcS
   - sudo add-apt-repository -y "deb http://mirrors.kernel.org/ubuntu vivid main universe"
   - sudo apt-get -y update
   - sudo apt-get install -y --force-yes libvirt-bin virtinst shellcheck
