@@ -4,6 +4,7 @@ python: "2.7"
 
 install:
   # Install dependencies - delete files to allow upgrade
+  - sudo add-apt-repository -y "deb http://mirrors.kernel.org/ubuntu trusty main universe"
   - sudo apt-get -y update
   - sudo apt-get install -y --force-yes libvirt-bin virtinst cabal-install
   - sudo cabal update
