@@ -19,7 +19,8 @@ install:
 
   #See if we can setup a VM
   - sudo virsh net-list
-  - sudo virsh --connect qemu:///system capabilities
+  # Uncomment for more details
+  #- sudo virsh --connect qemu:///system capabilities
 
   #install Shellcheck
   #- sudo apt-get install -y -o Dpkg::Options::="--force-confnew" cabal-install
@@ -59,14 +60,21 @@ script:
   - shellcheck fi-backup.sh
 
   # Test0: stop VMs and see if offline backup works, then restart domains
-  - sudo virsh --connect qemu:///system shutdown t1d
-  - sudo virsh --connect qemu:///system shutdown t2d
+  # shutdown can't be monitored from within virsh. Wait to ensure full start/stop
+  - mkdir /tmp/backup_off\ dir
+  - sudo chmod 0777 /tmp/backup_off\ dir
+  - sleep 20
+  - sudo virsh shutdown t1d
+  - sleep 15
+  - sudo virsh -r list --all
+  - sudo virsh shutdown t2d
+  - sleep 15
+  - sudo virsh -r list --all
+  - sudo ./fi-backup.sh -d -b /tmp/backup_off\ dir all
+  - ls -la /tmp/backup_off\ dir/test*
   - sleep 2
-  - sudo ./fi-backup -d -b /tmp/backup\ dir all
-  - ls -la /tmp/backup\ dir/test*
-  - sleep 2
-  - sudo virsh --connect qemu:///system start t1d
-  - sudo virsh --connect qemu:///system start t2d
+  - sudo virsh start t1d
+  - sudo virsh start t2d
   - sleep 2
 
   # Test1 1 disk, spaces in filenames
