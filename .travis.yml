@@ -16,6 +16,7 @@ install:
   - sudo sh -c 'echo "security_driver = \"none\"" >> /etc/libvirt/qemu.conf'
   - sudo service libvirt-bin restart
   - sudo service qemu-kvm restart
+  - sleep 2
 
   #See if we can setup a VM
   - sudo virsh net-list
