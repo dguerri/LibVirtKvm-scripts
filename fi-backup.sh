@@ -367,7 +367,7 @@ function consolidate_domain() {
    fi
 
    print_v d "Consolidation of block devices for '$domain_name' requested"
-   print_v d "Block devices to be consolidated:\n\t${block_devices[@]}"
+   print_v d "Block devices to be consolidated:\n\t${block_devices[*]}"
 
    for ((i = 0; i < ${#block_devices[@]}; i++)); do
       block_device="${block_devices[$i]}"
@@ -573,14 +573,26 @@ if [ -z "$DOMAIN_NAME" ]; then
    exit 2
 fi
 
-DOMAINS=
+DOMAINS_RUNNING=
+DOMAINS_NOTRUNNING=
 if [ "$DOMAIN_NAME" == "all" ]; then
-   DOMAINS=$($VIRSH -q -r list | awk '{print $2;}')
+   DOMAINS_RUNNING=$($VIRSH -q -r list --state-running | awk '{print $2;}')
+   DOMAINS_NOTRUNNING=$($VIRSH -q -r list --all --state-shutoff --state-paused | awk '{print $2;}')
 else
-   DOMAINS=$DOMAIN_NAME
+   for THIS_DOMAIN in $DOMAIN_NAME; do
+     DOMAIN_STATE=$($VIRSH -q domstate "$THIS_DOMAIN")
+     if [ "$DOMAIN_STATE" == running ]; then
+       DOMAINS_RUNNING="$DOMAINS_RUNNING $THIS_DOMAIN"
+     else 
+       DOMAINS_NOTRUNNING="$DOMAINS_NOTRUNNING $THIS_DOMAIN"
+     fi
+   done
 fi
 
-for DOMAIN in $DOMAINS; do
+print_v d "Domains NOTRUNNING: $DOMAINS_NOTRUNNING"
+print_v d "Domains RUNNING: $DOMAINS_RUNNING"
+
+for DOMAIN in $DOMAINS_RUNNING; do
    _ret=0
    if [ $SNAPSHOT -eq 1 ]; then
       try_lock "$DOMAIN"
@@ -602,6 +614,42 @@ for DOMAIN in $DOMAINS; do
       else
          print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping consolidation of '$DOMAIN'"
       fi
+   fi
+done
+
+for DOMAIN in $DOMAINS_NOTRUNNING; do
+   _ret=0
+   declare -a all_backing_files=()
+   try_lock "$DOMAIN"
+   if [ $? -eq 0 ]; then
+      get_block_devices "$DOMAIN" block_devices
+      #print_v d "DOMAIN $DOMAIN $BACKUP_DIRECTORY/ $block_devices"
+      for ((i = 0; i < ${#block_devices[@]}; i++)); do
+         backing_file=""
+         block_device="${block_devices[$i]}"
+         print_v d "Backing up: cp -up $backing_file $BACKUP_DIRECTORY/"
+         cp -up "$block_device" "$BACKUP_DIRECTORY"/ || print_v e "Unable to cp -up $block_device"
+         get_backing_file "$block_device" backing_file
+         j=0
+         all_backing_files[$j]=$backing_file
+         while [ -n "$backing_file" ]; do
+            ((j++))
+            all_backing_files[$j]=$backing_file
+            print_v d "Parent block device: '$backing_file'"
+            #In theory snapshots are unchanged so we can use one time cp instead of rsync
+            print_v d "Backing up: cp -up $backing_file $BACKUP_DIRECTORY/"
+            cp -up "$backing_file" "$BACKUP_DIRECTORY"/ || print_v e "Unable to cp -up $backing_file"
+            #get next backing file if it exists
+            get_backing_file "$backing_file" parent_backing_file
+            print_v d "Next file in backing file chain: '$parent_backing_file'"
+            backing_file="$parent_backing_file"
+         done
+      done
+      print_v d "All ${#all_backing_files[@]} block files for '$DOMAIN': $block_device : ${all_backing_files[*]}"
+      _ret=$?
+      unlock "$DOMAIN"
+   else
+      print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping backup of '$DOMAIN'"
    fi
 done
 
