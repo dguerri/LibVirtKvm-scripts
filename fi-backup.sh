@@ -115,8 +115,9 @@ function unlock() {
 function check_version()
 {
     local version=$1 check=$2
-    local winner=$(echo -e "$version\n$check" | sed '/^$/d' | sort -Vr | \
-      head -1)
+    local winner=
+
+    winner=$(echo -e "$version\n$check" | sed '/^$/d' | sort -Vr | head -1)
     [[ "$winner" = "$version" ]] && return 0
     return 1
 }
@@ -177,7 +178,9 @@ function dump_state() {
 
    local _dump_state_filename="$DUMP_STATE_DIRECTORY/$domain_name.statefile-$timestamp.gz"
 
-   local output=$($VIRSH qemu-monitor-command "$domain_name" '{"execute": "migrate", "arguments": {"uri": "exec:gzip -c > ' "'$_dump_state_filename'" '"}}' 2>&1)
+   local output=
+
+   output=$($VIRSH qemu-monitor-command "$domain_name" '{"execute": "migrate", "arguments": {"uri": "exec:gzip -c > ' "'$_dump_state_filename'" '"}}' 2>&1)
    if [ $? -ne 0 ]; then
       print_v e "Failed to dump domain state: '$output'"
       return 1
@@ -243,8 +246,10 @@ function snapshot_domain() {
    local new_parent_backing_file=
    local parent_backing_file=
 
-   local timestamp=$(date "+%Y%m%d-%H%M%S")
+   local timestamp=
    local resume_vm=0
+
+   timestamp=$(date "+%Y%m%d-%H%M%S")
 
    print_v d "Snapshot for domain '$domain_name' requested"
    print_v d "Using timestamp '$timestamp'"
@@ -583,7 +588,7 @@ else
      DOMAIN_STATE=$($VIRSH -q domstate "$THIS_DOMAIN")
      if [ "$DOMAIN_STATE" == running ]; then
        DOMAINS_RUNNING="$DOMAINS_RUNNING $THIS_DOMAIN"
-     else 
+     else
        DOMAINS_NOTRUNNING="$DOMAINS_NOTRUNNING $THIS_DOMAIN"
      fi
    done
