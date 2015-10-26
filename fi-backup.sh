@@ -41,6 +41,9 @@ SNAPSHOT=1
 SNAPSHOT_PREFIX="bimg"
 DUMP_STATE_TIMEOUT=60
 DUMP_STATE_DIRECTORY=
+CONSOLIDATION_METHOD="blockpull"
+CONSOLIDATION_FLAGS=(--wait)
+
 
 function print_v() {
    local level=$1
@@ -373,6 +376,7 @@ function consolidate_domain() {
 
    print_v d "Consolidation of block devices for '$domain_name' requested"
    print_v d "Block devices to be consolidated:\n\t${block_devices[*]}"
+   print_v d "Consolidation method: $CONSOLIDATION_METHOD"
 
    for ((i = 0; i < ${#block_devices[@]}; i++)); do
       block_device="${block_devices[$i]}"
@@ -384,13 +388,23 @@ function consolidate_domain() {
          print_v d "Parent block device: '$backing_file'"
 
          # Consolidate the block device
-         command_output=$($VIRSH -q blockpull "$domain_name" "$block_device" \
-            --wait --verbose 2>&1)
+         command_output=$($VIRSH -q "$CONSOLIDATION_METHOD" "$domain_name" \
+            "$block_device" "${CONSOLIDATION_FLAGS[@]}" 2>&1)
          if [ $? -eq 0 ]; then
             print_v v "Consolidation of block device '$block_device' for '$domain_name' successful"
          else
             print_v e "Error consolidating block device '$block_device' for '$domain_name':\n $command_output"
             return 1
+         fi
+
+         if [ "$CONSOLIDATION_METHOD" == "blockcommit" ]; then
+            # --delete option for blockcommit doesn't work (tested on
+            # LibVirt 1.2.16, QEMU 2.3.0), so we need to manually delete old
+            # backing files.
+            # blockcommit will pivot the block device file with the base one
+            # (the one originally used) so we can delete all the files created
+            # by this script, starting from "$block_device".
+            backing_file="$block_device"
          fi
 
          # Deletes all old block devices
@@ -403,9 +417,8 @@ function consolidate_domain() {
             echo "$backing_file" | grep -q \
                "\.$SNAPSHOT_PREFIX-[0-9]\{8\}\-[0-9]\{6\}$"
             if [ $? -ne 0 ]; then
-               print_v w "'$backing_file' doesn't seem to be a backup backing file image."
-               print_v w "Stopping backing file chain removal (manual intervetion might be required)"
-               print_v w "This is expected if this is the first consolidation"
+               print_v i "'$backing_file' doesn't seem to be a backup backing file image."
+               print_v i "Stopping backing file chain removal"
                break
             fi
 
@@ -435,6 +448,19 @@ function consolidate_domain() {
    return 0
 }
 
+function libvirt_version() {
+    $VIRSH -v
+}
+
+function qemu_version() {
+    $QEMU --version | awk '/^QEMU emulator version / { print $4 }'
+}
+
+function qemu_img_version() {
+    $QEMU_IMG -h | awk '/qemu-img version / { print $3 }' | cut -d',' -f1
+}
+
+
 # Dependencies check
 function dependencies_check() {
    local _ret=0
@@ -455,7 +481,7 @@ function dependencies_check() {
       _ret=1
    fi
 
-   version=$($VIRSH -v)
+   version=$(libvirt_version)
    if check_version "$version" '0.9.13'; then
       if check_version "$version" '1.0.0'; then
          print_v i "libVirt version '$version' support is experimental"
@@ -467,8 +493,7 @@ function dependencies_check() {
       _ret=2
    fi
 
-   version=$($QEMU_IMG -h | awk '/qemu-img version / { print $3 }' | \
-      cut -d',' -f1)
+   version=$(qemu_img_version)
    if check_version "$version" '1.2.0'; then
       print_v d "$QEMU_IMG version '$version' is supported"
    else
@@ -476,7 +501,7 @@ function dependencies_check() {
       _ret=2
    fi
 
-   version=$($QEMU --version | awk '/^QEMU emulator version / { print $4 }')
+   version=$(qemu_version)
    if check_version "$version" '1.2.0'; then
       print_v d "QEMU/KVM version '$version' is supported"
    else
@@ -557,6 +582,11 @@ if [ $CONSOLIDATION -eq 1 ]; then
       print_usage \
          "consolidation (-c | -C) and dump state (-s) are not compatible"
       exit 1
+   fi
+   if check_version "$(qemu_version)" '2.1.0' && \
+      check_version "$(libvirt_version)" '1.2.9'; then
+      CONSOLIDATION_METHOD="blockcommit"
+      CONSOLIDATION_FLAGS=(--wait --pivot --active)
    fi
 fi
 
