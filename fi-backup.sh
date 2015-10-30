@@ -364,6 +364,13 @@ function consolidate_domain() {
    local command_output=
    local parent_backing_file=
 
+   local dom_state=
+   dom_state=$($VIRSH domstate "$domain_name" 2>&1)
+   if [ "$dom_state" != "running" ]; then
+      print_v e "Error: Consolidation requires '$domain_name' to be running"
+      return 1
+   fi
+
    local block_devices=''
    get_block_devices "$domain_name" block_devices
    if [ $? -ne 0 ]; then
@@ -625,6 +632,9 @@ done
 for DOMAIN in $DOMAINS_NOTRUNNING; do
    _ret=0
    declare -a all_backing_files=()
+   if [ $_ret -eq 0 -a $CONSOLIDATION -eq 1 ]; then
+      print_v e "Consolidation only works with running domains. '$DOMAIN' is not running! Doing full backup only of '$DOMAIN'"
+   fi
    try_lock "$DOMAIN"
    if [ $? -eq 0 ]; then
       get_block_devices "$DOMAIN" block_devices
