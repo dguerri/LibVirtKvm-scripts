@@ -632,11 +632,31 @@ done
 for DOMAIN in $DOMAINS_NOTRUNNING; do
    _ret=0
    declare -a all_backing_files=()
+   if [ "$BACKUP_DIRECTORY" == "" ]; then
+         print_v e "-b flag (directory) required for backing up the shut-off domain '$DOMAIN'"
+         print_v e "Skipping backup of '$DOMAIN'"
+         _ret=1
+   fi
    if [ $_ret -eq 0 -a $CONSOLIDATION -eq 1 ]; then
       print_v e "Consolidation only works with running domains. '$DOMAIN' is not running! Doing full backup only of '$DOMAIN'"
+      if [ "$DOMAIN_NAME" != "all" ]; then
+         print_v e "Skipping consolidation/backup of '$DOMAIN'"
+         _ret=1
+      else
+         print_v d "Doing full backup (not consolidation) of '$DOMAIN'"
+         _ret=0
+      fi
    fi
-   try_lock "$DOMAIN"
-   if [ $? -eq 0 ]; then
+
+   if [ $_ret -eq 0 ]; then
+      try_lock "$DOMAIN"
+      if [ $? -eq 0 ]; then
+         print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping backup of '$DOMAIN'"
+         _ret=1
+      fi
+   fi
+
+   if [ $_ret -eq 0 ]; then
       get_block_devices "$DOMAIN" block_devices
       #print_v d "DOMAIN $DOMAIN $BACKUP_DIRECTORY/ $block_devices"
       for ((i = 0; i < ${#block_devices[@]}; i++)); do
@@ -663,8 +683,6 @@ for DOMAIN in $DOMAINS_NOTRUNNING; do
       print_v d "All ${#all_backing_files[@]} block files for '$DOMAIN': $block_device : ${all_backing_files[*]}"
       _ret=$?
       unlock "$DOMAIN"
-   else
-      print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping backup of '$DOMAIN'"
    fi
 done
 
