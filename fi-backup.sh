@@ -650,9 +650,9 @@ for DOMAIN in $DOMAINS_NOTRUNNING; do
 
    if [ $_ret -eq 0 ]; then
       try_lock "$DOMAIN"
-      if [ $? -eq 0 ]; then
+      _ret=$?
+      if [ $_ret -ne 0 ]; then
          print_v e "Another instance of $0 is already running on '$DOMAIN'! Skipping backup of '$DOMAIN'"
-         _ret=1
       fi
    fi
 
