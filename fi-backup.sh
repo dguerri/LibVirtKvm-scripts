@@ -41,6 +41,7 @@ SNAPSHOT=1
 SNAPSHOT_PREFIX="bimg"
 DUMP_STATE_TIMEOUT=60
 DUMP_STATE_DIRECTORY=
+CONSOLIDATION_SET=0
 CONSOLIDATION_METHOD="blockpull"
 CONSOLIDATION_FLAGS=(--wait)
 
@@ -75,12 +76,13 @@ function print_usage() {
 
    Usage:
 
-   $0 [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] <domain name>|all
+   $0 [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] [-m <method>] <domain name>|all
 
    Options
       -b <directory>    Copy previous snapshot/base image to the specified <directory>
       -c                Consolidation only
       -C                Snapshot and consolidation
+      -m <method>       Consolidation method: blockcommit or blockpull
       -q                Use quiescence (qemu agent must be installed in the domain)
       -s <directory>    Dump domain status in the specified directory
       -d                Debug
@@ -146,6 +148,36 @@ function get_block_devices() {
    return 0
 }
 
+# Function: get_snapshot_chain()
+# Return an array of all backing files
+#
+# Input:    Block Device
+# Output:   An array containing a backing file list
+# Return:   0 on success, non 0 otherwise
+function get_snapshot_chain() {
+   local endmost_child=$1 return_var=$2
+   local _parent_backing_file=
+   local _backing_file=
+   local i=0
+   local _ret=
+
+   eval "$return_var[$i]=\"$endmost_child\""
+
+   _ret=1
+
+   get_backing_file "$endmost_child" _parent_backing_file
+   while [ -n "$_parent_backing_file" ]; do
+      ((i++))
+      eval "$return_var[$i]=\"$_parent_backing_file\""
+      #get next backing file if it exists
+      _backing_file="$_parent_backing_file"
+      get_backing_file "$_backing_file" _parent_backing_file
+      #print_v d "Next file in backing file chain: '$_parent_backing_file'"
+      _ret=0
+   done 
+
+   return $_ret
+}
 # Function: get_backing_file()
 # Return the immediate parent of a qcow2 image file (i.e. the backing file)
 #
@@ -388,13 +420,15 @@ function consolidate_domain() {
    for ((i = 0; i < ${#block_devices[@]}; i++)); do
       block_device="${block_devices[$i]}"
       print_v d \
-         "Consolidation of block device: '$block_device' for '$domain_name'"
+         "Consolidation of '$i' block device: '$block_device' for '$domain_name'"
 
       get_backing_file "$block_device" backing_file
       if [ -n "$backing_file" ]; then
          print_v d "Parent block device: '$backing_file'"
 
          # Consolidate the block device
+         #echo "ABOUT TO RUN:" 
+         #echo "$VIRSH -q $CONSOLIDATION_METHOD $domain_name $block_device ${CONSOLIDATION_FLAGS[*]}"
          command_output=$($VIRSH -q "$CONSOLIDATION_METHOD" "$domain_name" \
             "$block_device" "${CONSOLIDATION_FLAGS[@]}" 2>&1)
          if [ $? -eq 0 ]; then
@@ -404,6 +438,15 @@ function consolidate_domain() {
             return 1
          fi
 
+         snapshot_chain=()
+         #get an array of the snapshot chain starting from last child and iterating backwards
+         # e.g.    [0]     [1]      [2]     [3]
+         #       snap3 <- snap2 <- snap1 <- orig
+         #
+         # blockcommit: orig -> snap1 -> snap2 -> snap3 [becomes] orig
+         # blockpull:   orig -> snap1 -> snap2 -> snap3 [becomes] snap3
+         get_snapshot_chain "$block_device" snapshot_chain
+
          if [ "$CONSOLIDATION_METHOD" == "blockcommit" ]; then
             # --delete option for blockcommit doesn't work (tested on
             # LibVirt 1.2.16, QEMU 2.3.0), so we need to manually delete old
@@ -411,41 +454,29 @@ function consolidate_domain() {
             # blockcommit will pivot the block device file with the base one
             # (the one originally used) so we can delete all the files created
             # by this script, starting from "$block_device".
-            backing_file="$block_device"
+            #
+            print_v d \
+              "Not deleting last element of snapshot_chain (top parent) since consolidation method='blockcommit'"
+            unset snapshot_chain[${#snapshot_chain[@]}-1]
+         else
+            print_v d \
+               "Not deleting 0th element of snapshot_chain (last child) since consolidation method='blockpull'"
+            snapshot_chain=("${snapshot_chain[@]:1}")
          fi
+         #echo "Complete Chain=" ${snapshot_chain[@]}
 
          # Deletes all old block devices
-         print_v v "Deleting old backup files for '$domain_name'"
-         while [ -n "$backing_file" ]; do
-            print_v d \
-            "Processing old backing file '$backing_file' for '$domain_name'"
+         print_v v "Deleting old backing files for '$domain_name'"
 
-            # Check if this is a backup backing file...
-            echo "$backing_file" | grep -q \
-               "\.$SNAPSHOT_PREFIX-[0-9]\{8\}\-[0-9]\{6\}$"
-            if [ $? -ne 0 ]; then
-               print_v i "'$backing_file' doesn't seem to be a backup backing file image."
-               print_v i "Stopping backing file chain removal"
-               break
-            fi
-
-            get_backing_file "$backing_file" parent_backing_file
-            _ret=$?
-            print_v d "Parent backing file: '$parent_backing_file'"
-            if [ $_ret -eq 0 ]; then
-               print_v v "Deleting backing file '$backing_file'"
-               rm "$backing_file"
-               if [ $? -ne 0 ]; then
-                  print_v w "Cannot delete '$backing_file'!"
-                  print_v w "Stopping backing file chain removal (manual intervetion might be required)"
-                  break
-               fi
-            else
-               print_v e "Problem getting backing file for '$backing_file'"
-               break
-            fi
-            backing_file="$parent_backing_file"
-            print_v d "Next file in backing file chain: '$parent_backing_file'"
+         _ret=$?
+         for ((j = 0; j < ${#snapshot_chain[@]}; j++)); do
+           print_v v \
+              "Deleting old backing file '${snapshot_chain[$j]}' for '$domain_name'"
+           rm "${snapshot_chain[$j]}"
+           if [ $? -ne 0 ]; then
+              print_v w "Could not delete file '${snapshot_chain[$j]}'!"
+              break
+           fi
          done
       else
          print_v d "No backing file found for '$block_device'. Nothing to do."
@@ -519,7 +550,7 @@ function dependencies_check() {
    return $_ret
 }
 
-while getopts "b:cCs:qdhvV" opt; do
+while getopts "b:cCm:s:qdhvV" opt; do
    case $opt in
       b)
          BACKUP_DIRECTORY=$OPTARG
@@ -543,6 +574,18 @@ while getopts "b:cCs:qdhvV" opt; do
          fi
          CONSOLIDATION=1
          SNAPSHOT=1
+      ;;
+      m)
+         CONSOLIDATION_METHOD=$OPTARG
+         CONSOLIDATION_SET=1
+         if [ "$CONSOLIDATION_METHOD" == "blockcommit" ]; then
+            CONSOLIDATION_FLAGS=(--wait --pivot --active)
+         elif [ "$CONSOLIDATION_METHOD" == "blockpull" ]; then
+            CONSOLIDATION_FLAGS=(--wait)
+         else
+            print_usage "-m requires specifying 'blockcommit' or 'blockpull'"
+            exit 1
+         fi
       ;;
       q)
          QUIESCE=1
@@ -590,10 +633,12 @@ if [ $CONSOLIDATION -eq 1 ]; then
          "consolidation (-c | -C) and dump state (-s) are not compatible"
       exit 1
    fi
-   if check_version "$(qemu_version)" '2.1.0' && \
-      check_version "$(libvirt_version)" '1.2.9'; then
-      CONSOLIDATION_METHOD="blockcommit"
-      CONSOLIDATION_FLAGS=(--wait --pivot --active)
+   if [ $CONSOLIDATION_SET -eq 0 ]; then
+     if check_version "$(qemu_version)" '2.1.0' && \
+        check_version "$(libvirt_version)" '1.2.9'; then
+        CONSOLIDATION_METHOD="blockcommit"
+        CONSOLIDATION_FLAGS=(--wait --pivot --active)
+     fi
    fi
 fi
 
