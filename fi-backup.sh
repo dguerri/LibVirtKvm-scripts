@@ -174,7 +174,7 @@ function get_snapshot_chain() {
       get_backing_file "$_backing_file" _parent_backing_file
       #print_v d "Next file in backing file chain: '$_parent_backing_file'"
       _ret=0
-   done 
+   done
 
    return $_ret
 }
@@ -426,8 +426,17 @@ function consolidate_domain() {
       if [ -n "$backing_file" ]; then
          print_v d "Parent block device: '$backing_file'"
 
+         snapshot_chain=()
+         #get an array of the snapshot chain starting from last child and iterating backwards
+         # e.g.    [0]     [1]      [2]     [3]
+         #       snap3 <- snap2 <- snap1 <- orig
+         #
+         # blockcommit: orig -> snap1 -> snap2 -> snap3 [becomes] orig
+         # blockpull:   orig -> snap1 -> snap2 -> snap3 [becomes] snap3
+         get_snapshot_chain "$block_device" snapshot_chain
+
          # Consolidate the block device
-         #echo "ABOUT TO RUN:" 
+         #echo "ABOUT TO RUN:"
          #echo "$VIRSH -q $CONSOLIDATION_METHOD $domain_name $block_device ${CONSOLIDATION_FLAGS[*]}"
          command_output=$($VIRSH -q "$CONSOLIDATION_METHOD" "$domain_name" \
             "$block_device" "${CONSOLIDATION_FLAGS[@]}" 2>&1)
@@ -437,15 +446,6 @@ function consolidate_domain() {
             print_v e "Error consolidating block device '$block_device' for '$domain_name':\n $command_output"
             return 1
          fi
-
-         snapshot_chain=()
-         #get an array of the snapshot chain starting from last child and iterating backwards
-         # e.g.    [0]     [1]      [2]     [3]
-         #       snap3 <- snap2 <- snap1 <- orig
-         #
-         # blockcommit: orig -> snap1 -> snap2 -> snap3 [becomes] orig
-         # blockpull:   orig -> snap1 -> snap2 -> snap3 [becomes] snap3
-         get_snapshot_chain "$block_device" snapshot_chain
 
          if [ "$CONSOLIDATION_METHOD" == "blockcommit" ]; then
             # --delete option for blockcommit doesn't work (tested on
