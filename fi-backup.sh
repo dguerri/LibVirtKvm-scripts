@@ -278,7 +278,6 @@ function snapshot_domain() {
    local extra_args=
    local command_output=
    local new_backing_file=
-   local new_parent_backing_file=
    local parent_backing_file=
 
    local timestamp=
@@ -318,10 +317,11 @@ function snapshot_domain() {
    if [ $? -eq 0 ]; then
       print_v v "Snapshot for block devices of '$domain_name' successful"
 
-      if [ -n "$BACKUP_DIRECTORY" -a ! -d "$BACKUP_DIRECTORY" ]; then
+      if [ -n "$BACKUP_DIRECTORY" ] && [ ! -d "$BACKUP_DIRECTORY" ]; then
          print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exist"
          _ret=1
-      elif [ -n "$BACKUP_DIRECTORY" -a -d "$BACKUP_DIRECTORY" ]; then
+      elif [ -n "$BACKUP_DIRECTORY" ] && [ -d "$BACKUP_DIRECTORY" ]; then
+         #make backup after snapshot
          get_block_devices "$domain_name" block_devices
          if [ $? -ne 0 ]; then
             print_v e "Error getting block device list for domain \
@@ -330,36 +330,19 @@ function snapshot_domain() {
          else
             for ((i = 0; i < ${#block_devices[@]}; i++)); do
                block_device="${block_devices[$i]}"
-               get_backing_file "$block_device" backing_file
-
-               if [ -f "$backing_file" ]; then
-                  backing_file_base=$(basename "$backing_file")
+               #if this is the fist run, need entire chain to back up
+               print_v d "Getting all backing files for: '$block_device'"
+               local snapshot_chain=()
+               get_snapshot_chain "$block_device" snapshot_chain
+               #backup entire chain except the snapshot just made (0th element of chain)
+               for ((j = 1; j < ${#snapshot_chain[@]} ; j++)); do
+                  backing_file_base=$(basename "${snapshot_chain[$j]}")
                   new_backing_file="$BACKUP_DIRECTORY/$backing_file_base"
 
                   print_v v \
-                     "Copy backing file '$backing_file' to '$new_backing_file'"
-                  cp "$backing_file" "$new_backing_file"
-
-                  get_backing_file "$backing_file" parent_backing_file
-                  if [ $? -ne 0 ]; then
-                     print_v e "Problem getting backing file for '$backing_file'"
-                     continue
-                  fi
-                  if [ -n "$parent_backing_file" ]; then
-                     print_v d "Parent backing file: '$parent_backing_file'"
-                     parent_backing_file_base=$(basename \
-                        "$parent_backing_file")
-                     new_parent_backing_file="$BACKUP_DIRECTORY/$parent_backing_file_base"
-                     if [ ! -f "$new_parent_backing_file" ]; then
-                        print_v w "Backing file for current snapshot doesn't exist in '$BACKUP_DIRECTORY'!"
-                     fi
-                  else
-                     print_v v "No parent backing file for '$backing_file'"
-                  fi
-               else
-                  print_v e "Error getting backing file for '$block_device'."
-                  _ret=1
-               fi
+                     "Copy backing file '${snapshot_chain[$j]}' to '$new_backing_file'"
+                  cp -u "${snapshot_chain[$j]}" "$new_backing_file"
+               done
             done
          fi
       else
@@ -425,6 +408,15 @@ function consolidate_domain() {
       get_backing_file "$block_device" backing_file
       if [ -n "$backing_file" ]; then
          print_v d "Parent block device: '$backing_file'"
+         snapshot_chain=()
+         #get an array of the snapshot chain starting from last child and iterating backwards
+         # e.g.    [0]     [1]      [2]     [3]
+         #       snap3 <- snap2 <- snap1 <- orig
+         #
+         # blockcommit: orig -> snap1 -> snap2 -> snap3 [becomes] orig
+         # blockpull:   orig -> snap1 -> snap2 -> snap3 [becomes] snap3
+         #do this BEFORE consolidation so that we keep complete chain info
+         get_snapshot_chain "$block_device" snapshot_chain
 
          # Consolidate the block device
          #echo "ABOUT TO RUN:" 
@@ -438,14 +430,6 @@ function consolidate_domain() {
             return 1
          fi
 
-         snapshot_chain=()
-         #get an array of the snapshot chain starting from last child and iterating backwards
-         # e.g.    [0]     [1]      [2]     [3]
-         #       snap3 <- snap2 <- snap1 <- orig
-         #
-         # blockcommit: orig -> snap1 -> snap2 -> snap3 [becomes] orig
-         # blockpull:   orig -> snap1 -> snap2 -> snap3 [becomes] snap3
-         get_snapshot_chain "$block_device" snapshot_chain
 
          if [ "$CONSOLIDATION_METHOD" == "blockcommit" ]; then
             # --delete option for blockcommit doesn't work (tested on
@@ -692,7 +676,7 @@ for DOMAIN in $DOMAINS_RUNNING; do
       fi
    fi
 
-   if [ $_ret -eq 0 -a $CONSOLIDATION -eq 1 ]; then
+   if [ $_ret -eq 0 ] && [ $CONSOLIDATION -eq 1 ]; then
       try_lock "$DOMAIN"
       if [ $? -eq 0 ]; then
          consolidate_domain "$DOMAIN"
@@ -712,7 +696,7 @@ for DOMAIN in $DOMAINS_NOTRUNNING; do
          print_v e "Skipping backup of '$DOMAIN'"
          _ret=1
    fi
-   if [ $_ret -eq 0 -a $CONSOLIDATION -eq 1 ]; then
+   if [ $_ret -eq 0 ] && [ $CONSOLIDATION -eq 1 ]; then
       print_v e "Consolidation only works with running domains. '$DOMAIN' is not running! Doing full backup only of '$DOMAIN'"
       if [ "$DOMAIN_NAME" != "all" ]; then
          print_v e "Skipping consolidation/backup of '$DOMAIN'"
