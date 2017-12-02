@@ -19,11 +19,25 @@ In order to perform consistent backups, you can use two different strategies:
 1. use domain quiescence (`-q` option, see below). This requires configuring the domain to use quiescence (e.g. `apt-get install qemu-guest-agent` inside VM);
 2. dump domain state (`-s <directory>` option, see below). In this case the domain is paused, its state is dumped, a snapshot of all its disks is performed and then the domain is restarted.
 
-Option number 2 doesn't require agents installed in the domain, but it will pause the VM for some seconds (the actual number of secords depends on how busy the VM is and the mount of RAM given to the VM).
+Option number 2 doesn't require agents installed in the domain, but it will pause the VM for some 
+seconds (the actual number of secords depends on how busy the VM is and the mount of RAM given to the VM).
 For very busy domain, state dump could not complete, expecially if it is done on slow disks (e.g. NFS).
 
-Offline backups work by comparing timestamps on the VM images vs the backup timestamps and doing a "cp --update" which only updates
-the backups if the image timestamp is newer than the backup timestamp.
+Offline backups work by comparing timestamps on the VM images vs the backup timestamps and doing a 
+"cp --update" which only updates the backups if the image timestamp is newer than the backup timestamp.
+
+Backup method blockpull works as orig -> snap1 -> snap2 -> ... \[becomes\] snap3. This has the benefit
+that snap3 will be a compressed image only taking up as much space as was used by the VM's OS. For example: 
+if you have a 100 GB Virtual Machine file that only uses 10 GB on the VM your snap3 will only be about 
+10 GB, saving you 90 GB of disk space. The disadvantage of this method is that it is very slow. 
+
+Backup method blockcommit works as orig -> snap1 -> snap2 -> .... \[becomes\] orig. This has the benefits
+that the file name of the VM does not change and is extremely quick (can complete in seconds) 
+relative to blockpull (can take several minutes depending on how large the VM is or how old the snapshot
+chain is). 
+
+A recommended method for automating fi-backup.sh is to have the first backup be done with --method=blockpull
+and all subsequent backups done via --method=blockcommit. 
 
 See sample usage below for more information.
 For more information about how backups are performed, see [Nuts and Bolts of fi-backup](NUTSNBOLTS.md)
@@ -55,18 +69,20 @@ Edit `/etc/libvirt/qemu.conf` and set
 
     Usage:
 
-    ./fi-backup.sh [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] <domain names separated by spaces>|all
+    ./fi-backup.sh [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] "<domains separated by spaces>"|all
 
     Options
-       -b <directory>    Copy previous snapshot/base image to the specified <directory>
-       -c                Consolidation only
-       -C                Snapshot and consolidation
-       -q                Use quiescence (qemu agent must be installed in the domain)
-       -s <directory>    Dump domain status in the specified directory
-       -d                Debug
-       -h                Print usage and exit
-       -v                Verbose
-       -V                Print version and exit
+       -b, --backup_dir <directory>      Copy previous snapshot/base image to the specified <directory>
+       -c, --consolidate_only            Consolidation only
+       -C, --consolidate_and_snapshot    Snapshot and consolidation
+       -m, --method <method>             Use blockpull or blockcommit for consolidation
+       -q, --quiesce                     Use quiescence (qemu agent must be installed in the domain)
+       -s, --dump_state_dir <directory>  Dump domain status in the specified directory
+       -d, --debug                       Debug
+       -r, --all_running                 Backup all running domains only (do not specify domains)
+       -h, --help                        Print usage and exit
+       -v, --verbose                     Verbose
+       -V, --version                     Print version and exit
 
 ### Sample usage
 
