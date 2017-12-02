@@ -44,6 +44,7 @@ DUMP_STATE_DIRECTORY=
 CONSOLIDATION_SET=0
 CONSOLIDATION_METHOD="blockpull"
 CONSOLIDATION_FLAGS=(--wait)
+ALL_RUNNING_DOMAINS=0
 
 
 function print_v() {
@@ -534,33 +535,40 @@ function dependencies_check() {
    return $_ret
 }
 
-while getopts "b:cCm:s:qdhvV" opt; do
-   case $opt in
-      b)
-         BACKUP_DIRECTORY=$OPTARG
-         if [ ! -d "$BACKUP_DIRECTORY" ]; then
-            print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exist!"
-            exit 1
-         fi
+TEMP=$(getopt -n "$APP_NAME" -o b:cCm:s:qrdhvV --long backup_dir:,consolidate_only,consolidate_and_snapshot,method:,quiesce,all_running,dump_state_dir:,debug,help,version,verbose -- "$@")
+if [ $? != 0 ] ; then echo "Failed parsing options." >&2 ; exit 1 ; fi
+
+eval set -- "$TEMP"
+while true; do 
+   case "$1" in 
+      -b|--backup_dir)
+        BACKUP_DIRECTORY=$2
+        if [ ! -d "$BACKUP_DIRECTORY" ]; then
+           print_v e "Backup directory '$BACKUP_DIRECTORY' doesn't exist!"
+           exit 1
+        fi
+        shift; shift
       ;;
-      c)
+      -c|--consolidate_only)
          if [ $CONSOLIDATION -eq 1 ]; then
             print_usage "-c or -C already specified!"
-            exit 1
+          exit 1
          fi
          CONSOLIDATION=1
          SNAPSHOT=0
+         shift
       ;;
-      C)
+      -C|--consolidate_and_snaphot)
          if [ $CONSOLIDATION -eq 1 ]; then
             print_usage "-c or -C already specified!"
-            exit 1
+         exit 1
          fi
          CONSOLIDATION=1
          SNAPSHOT=1
+         shift
       ;;
-      m)
-         CONSOLIDATION_METHOD=$OPTARG
+      -m|--method)
+         CONSOLIDATION_METHOD=$2
          CONSOLIDATION_SET=1
          if [ "$CONSOLIDATION_METHOD" == "blockcommit" ]; then
             CONSOLIDATION_FLAGS=(--wait --pivot --active)
@@ -570,41 +578,53 @@ while getopts "b:cCm:s:qdhvV" opt; do
             print_usage "-m requires specifying 'blockcommit' or 'blockpull'"
             exit 1
          fi
+         shift;shift
       ;;
-      q)
+      -q|--quiesce)
          QUIESCE=1
+         shift
       ;;
-      s)
+      -r|--all_running)
+         ALL_RUNNING_DOMAINS=1
+         shift
+      ;;
+      -s|--dump_state_dir)
          DUMP_STATE=1
-         DUMP_STATE_DIRECTORY=$OPTARG
+         DUMP_STATE_DIRECTORY=$2
          if [ ! -d "$DUMP_STATE_DIRECTORY" ]; then
             print_v e \
                "Dump state directory '$DUMP_STATE_DIRECTORY' doesn't exist!"
             exit 1
          fi
+         shift;shift
       ;;
-      d)
+      -d|--debug)
          DEBUG=1
          VERBOSE=1
+         shift
       ;;
-      h)
+      -h|--help)
          print_usage
          exit 1
+         shift
       ;;
-      v)
+      -v|--verbose)
          VERBOSE=1
+         shift
       ;;
-      V)
+      -V|--version)
          echo "$APP_NAME version $VERSION"
+         shift
          exit 0
       ;;
-      \?)
-         echo "Invalid option: -$OPTARG" >&2
-         print_usage
-         exit 2
-      ;;
-   esac
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
 done
+
+if [ $ALL_RUNNING_DOMAINS -eq 1 ]; then
+   print_v d "all_running_domains = '$ALL_RUNNING_DOMAINS' so all running domains will be backed up"
+fi
 
 # Parameters validation
 if [ $CONSOLIDATION -eq 1 ]; then
@@ -633,20 +653,25 @@ if [ $DUMP_STATE -eq 1 ]; then
    fi
 fi
 
-shift $(( OPTIND - 1 ));
-
 dependencies_check
 [ $? -ne 0 ] && exit 3
 
 DOMAIN_NAME="$1"
-if [ -z "$DOMAIN_NAME" ]; then
+
+if [ -z "$DOMAIN_NAME" ] && [ $ALL_RUNNING_DOMAINS -eq 0 ]; then
    print_usage "<domain name> is missing!"
+   exit 2
+fi
+if [ ! -z "$DOMAIN_NAME" ] && [ $ALL_RUNNING_DOMAINS -eq 1 ]; then
+   print_usage "Setting all_running (-r) and specifying domains not compatible"
    exit 2
 fi
 
 DOMAINS_RUNNING=
 DOMAINS_NOTRUNNING=
-if [ "$DOMAIN_NAME" == "all" ]; then
+if [ "$ALL_RUNNING_DOMAINS" -eq 1 ]; then
+   DOMAINS_RUNNING=$($VIRSH -q -r list --state-running | awk '{print $2;}')
+elif [ "$DOMAIN_NAME" == "all" ]; then
    DOMAINS_RUNNING=$($VIRSH -q -r list --state-running | awk '{print $2;}')
    DOMAINS_NOTRUNNING=$($VIRSH -q -r list --all --state-shutoff --state-paused | awk '{print $2;}')
 else
@@ -660,8 +685,8 @@ else
    done
 fi
 
-print_v d "Domains NOTRUNNING: $DOMAINS_NOTRUNNING"
-print_v d "Domains RUNNING: $DOMAINS_RUNNING"
+print_v d "Domains NOTRUNNING to backup: $DOMAINS_NOTRUNNING"
+print_v d "Domains RUNNING to backup: $DOMAINS_RUNNING"
 
 for DOMAIN in $DOMAINS_RUNNING; do
    _ret=0
