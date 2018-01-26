@@ -26,14 +26,16 @@ For very busy domain, state dump could not complete, expecially if it is done on
 Offline backups work by comparing timestamps on the VM images vs the backup timestamps and doing a 
 "cp --update" which only updates the backups if the image timestamp is newer than the backup timestamp.
 
-The Backup method `blockpull` works as: `orig -> snap1 -> snap2 -> ... \[becomes\] snap3`. 
+The Backup method `blockpull` works as: `orig -> snap1 -> snap2 -> ... [becomes] snap3`. 
 
 The blockpull method has the benefit that snap3 will be a compressed image only taking up as much 
 space as was used by the VM's OS. For example: 
-if you have a 100 GB Virtual Machine file that only uses 10 GB on the VM your snap3 will only be about 
-10 GB, saving you 90 GB of disk space. The disadvantage of this method is that it is very slow. 
+if you have a 100 GB Virtual Machine file but the VM only uses 10 GB of that 100 GB, 
+then your image file for snap3 will only be about 10 GB, saving you 90 GB of disk space on the 
+VM host.  The disadvantage of this method is that it takes a long time for the blockpull to create
+the snap3 file (can be minutes). 
 
-The backup method `blockcommit` works as: `orig -> snap1 -> snap2 -> .... \[becomes\] orig`. 
+The backup method `blockcommit` works as: `orig -> snap1 -> snap2 -> .... [becomes] orig`. 
 
 The blockcommit method has the benefits that the file name of the VM does not change and the backup
 is extremely quick (can complete in seconds) relative to the blockpull method (can take several minutes 
