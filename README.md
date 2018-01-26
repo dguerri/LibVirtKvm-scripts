@@ -26,18 +26,25 @@ For very busy domain, state dump could not complete, expecially if it is done on
 Offline backups work by comparing timestamps on the VM images vs the backup timestamps and doing a 
 "cp --update" which only updates the backups if the image timestamp is newer than the backup timestamp.
 
-Backup method blockpull works as orig -> snap1 -> snap2 -> ... \[becomes\] snap3. This has the benefit
-that snap3 will be a compressed image only taking up as much space as was used by the VM's OS. For example: 
-if you have a 100 GB Virtual Machine file that only uses 10 GB on the VM your snap3 will only be about 
-10 GB, saving you 90 GB of disk space. The disadvantage of this method is that it is very slow. 
+The Backup method `blockpull` works as: `orig -> snap1 -> snap2 -> ... [becomes] snap3`. 
 
-Backup method blockcommit works as orig -> snap1 -> snap2 -> .... \[becomes\] orig. This has the benefits
-that the file name of the VM does not change and is extremely quick (can complete in seconds) 
-relative to blockpull (can take several minutes depending on how large the VM is or how old the snapshot
-chain is). 
+The blockpull method has the benefit that snap3 will be a compressed image only taking up as much 
+space as was used by the VM's OS. For example: 
+if you have a 100 GB Virtual Machine file but the VM only uses 10 GB of that 100 GB, 
+then the image file created for snap3 will only be about 10 GB, saving you 90 GB of disk space on the 
+VM host.  The disadvantage of this method is that it takes a long time for the blockpull to roll all
+previous backing files into the snap3 file (can be minutes).
 
-A recommended method for automating fi-backup.sh is to have the first backup be done with --method=blockpull
-and all subsequent backups done via --method=blockcommit. 
+The backup method `blockcommit` works as: `orig -> snap1 -> snap2 -> .... [becomes] orig`. 
+
+The blockcommit method has the benefits that the file name of the VM does not change and the backup
+is extremely quick (only a few seconds to roll the few changes back to orig) relative to the blockpull 
+method (can take several minutes depending on how large the VM is or how long the snapshot chain is). 
+The disadvantage of this method is that it does not shrink the size of orig. 
+
+A recommended method for automating backups via fi-backup.sh is to have the first backup be 
+done with `--method=blockpull`
+to create a smaller disk image and then for all subsequent backups use `--method=blockcommit`. 
 
 See sample usage below for more information.
 For more information about how backups are performed, see [Nuts and Bolts of fi-backup](NUTSNBOLTS.md)
