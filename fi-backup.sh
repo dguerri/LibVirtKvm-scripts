@@ -191,7 +191,7 @@ function get_backing_file() {
    local _ret=
    local _backing_file=
 
-   _backing_file=$($QEMU_IMG info ${QEMU_IMG_INFO_FLAGS[@]} "$file_name" | \
+   _backing_file=$($QEMU_IMG info "${QEMU_IMG_INFO_FLAGS[@]}" "$file_name" | \
       awk '/^backing file: / {$1=$2=""; print $0}'|sed 's/^[ \t]*//')
    _ret=$?
 
