@@ -44,6 +44,7 @@ DUMP_STATE_DIRECTORY=
 CONSOLIDATION_SET=0
 CONSOLIDATION_METHOD="blockpull"
 CONSOLIDATION_FLAGS=(--wait)
+QEMU_IMG_INFO_FLAGS=
 ALL_RUNNING_DOMAINS=0
 
 
@@ -190,7 +191,7 @@ function get_backing_file() {
    local _ret=
    local _backing_file=
 
-   _backing_file=$($QEMU_IMG info "$file_name" | \
+   _backing_file=$($QEMU_IMG info $QEMU_IMG_INFO_FLAGS "$file_name" | \
       awk '/^backing file: / {$1=$2=""; print $0}'|sed 's/^[ \t]*//')
    _ret=$?
 
@@ -519,6 +520,10 @@ function dependencies_check() {
    version=$(qemu_img_version)
    if check_version "$version" '1.2.0'; then
       print_v d "$QEMU_IMG version '$version' is supported"
+      if check_version "$version" '2.12.0'; then
+         $QEMU_IMG_INFO_FLAGS+=" -U"
+         print_v d "$QEMU_IMG later than 2.12.0, using --force-share/-U mode."
+      fi
    else
       print_v e "Unsupported $QEMU_IMG version '$version'. Please use 'qemu-img' 1.2.0 or later"
       _ret=2
@@ -771,3 +776,4 @@ for DOMAIN in $DOMAINS_NOTRUNNING; do
 done
 
 exit $_ret
+
