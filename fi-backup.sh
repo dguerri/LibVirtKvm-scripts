@@ -19,7 +19,7 @@
 # Copyright (C) 2013 2014 2015 Davide Guerri - davide.guerri@gmail.com
 #
 
-VERSION="2.1.0"
+VERSION="2.1.1"
 APP_NAME="fi-backup"
 
 # Fail if one process fails in a pipe
@@ -190,7 +190,16 @@ function get_backing_file() {
    local _ret=
    local _backing_file=
 
-   _backing_file=$($QEMU_IMG info "$file_name" | \
+   #Issue 45
+   version=$(qemu_img_version)
+   if check_version "$version" '2.10.0'; then
+      SHARE_FLAG="--force-share"
+   else
+      SHARE_FLAG=""
+   fi
+
+   version=$(qemu_version)
+   _backing_file=$($QEMU_IMG info $SHARE_FLAG "$file_name" | \
       awk '/^backing file: / {$1=$2=""; print $0}'|sed 's/^[ \t]*//')
    _ret=$?
 
