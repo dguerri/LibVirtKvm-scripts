@@ -162,14 +162,14 @@ function get_snapshot_chain() {
    local i=0
    local _ret=
 
-   eval "$return_var[$i]=\"$endmost_child\""
+   eval "${return_var[$i]}=\"$endmost_child\""
 
    _ret=1
 
    get_backing_file "$endmost_child" _parent_backing_file
    while [ -n "$_parent_backing_file" ]; do
       ((i++))
-      eval "$return_var[$i]=\"$_parent_backing_file\""
+      eval "${return_var[$i]}=\"$_parent_backing_file\""
       #get next backing file if it exists
       _backing_file="$_parent_backing_file"
       get_backing_file "$_backing_file" _parent_backing_file
