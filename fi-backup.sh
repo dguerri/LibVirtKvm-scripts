@@ -672,7 +672,7 @@ if [ -z "$DOMAIN_NAME" ] && [ $ALL_RUNNING_DOMAINS -eq 0 ]; then
    print_usage "<domain name> is missing!"
    exit 2
 fi
-if [ ! -z "$DOMAIN_NAME" ] && [ $ALL_RUNNING_DOMAINS -eq 1 ]; then
+if [ -n "$DOMAIN_NAME" ] && [ $ALL_RUNNING_DOMAINS -eq 1 ]; then
    print_usage "Setting all_running (-r) and specifying domains not compatible"
    exit 2
 fi
