@@ -189,17 +189,18 @@ function get_backing_file() {
    local file_name=$1 return_var=$2
    local _ret=
    local _backing_file=
+   local version=
 
    #Issue 45
    version=$(qemu_img_version)
    if check_version "$version" '2.10.0'; then
-      SHARE_FLAG="--force-share"
+      share_flag="--force-share"
    else
-      SHARE_FLAG=""
+      share_flag=""
    fi
 
    version=$(qemu_version)
-   _backing_file=$($QEMU_IMG info $SHARE_FLAG "$file_name" | \
+   _backing_file=$($QEMU_IMG info $share_flag "$file_name" | \
       awk '/^backing file: / {$1=$2=""; print $0}'|sed 's/^[ \t]*//')
    _ret=$?
 
