@@ -8,7 +8,7 @@ install:
   # Install dependencies
   - sudo apt-get -y update
   #- sudo apt-get install --reinstall -y -o Dpkg::Options::="--force-confnew" fontconfig fontconfig-config
-  - sudo apt-get install --reinstall -y -o Dpkg::Options::="--force-confnew" libvirt-bin virtinst qemu-kvm
+  - sudo apt-get install --reinstall -y -o Dpkg::Options::="--force-confnew" libvirt-bin virtinst qemu-kvm qemu-utils
 
   # Configure libvirt qemu
   - sudo sh -c 'echo "security_driver = \"none\"" >> /etc/libvirt/qemu.conf'
