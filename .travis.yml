@@ -56,7 +56,7 @@ install:
 
 script:
   # Check fi-backup.sh syntax
-  - shellcheck --exclude=SC2181 fi-backup.sh
+  - shellcheck --exclude=SC2181 --exclude=SC1087 fi-backup.sh
 
   # Test0: stop VMs and see if offline backup works, then restart domains
   # shutdown can't be monitored from within virsh. Wait to ensure full start/stop
