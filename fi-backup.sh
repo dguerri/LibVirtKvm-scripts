@@ -45,6 +45,7 @@ CONSOLIDATION_SET=0
 CONSOLIDATION_METHOD="blockpull"
 CONSOLIDATION_FLAGS=(--wait)
 ALL_RUNNING_DOMAINS=0
+QEMU_IMG_SHARE_FLAG=""
 
 
 function print_v() {
@@ -79,7 +80,7 @@ function print_usage() {
 
    $0 [-c|-C] [-q|-s <directory>] [-h] [-d] [-v] [-V] [-b <directory>] [-m <method>] <domain name>|all
 
-   Options
+   Options:
       -b <directory>    Copy previous snapshot/base image to the specified <directory>
       -c                Consolidation only
       -C                Snapshot and consolidation
@@ -90,6 +91,12 @@ function print_usage() {
       -h                Print usage and exit
       -v                Verbose
       -V                Print version and exit
+
+   Version Requirements:
+      bash     >= 4.3.0
+      qemu_img >= 1.2.0
+      qemu     >= 1.2.0
+      virsh    >= 0.9.13
 
 EOU
 }
@@ -136,13 +143,14 @@ function check_version()
 # Output:   An array containing a block device list
 # Return:   0 on success, non 0 otherwise
 function get_block_devices() {
-   local domain_name=$1 return_var=$2
+   local domain_name=$1
+   local -n return_var=$2
    local _ret=
 
-   eval "$return_var=()"
+   return_var=()
 
    while IFS= read -r file; do
-      eval "$return_var+=('$file')"
+      return_var+=("$file")
    done < <($VIRSH -q -r domblklist "$domain_name" --details|awk \
       '"disk"==$2 {$1=$2=$3=""; print $0}'|sed 's/^[ \t]*//')
 
@@ -156,26 +164,29 @@ function get_block_devices() {
 # Output:   An array containing a backing file list
 # Return:   0 on success, non 0 otherwise
 function get_snapshot_chain() {
-   local endmost_child=$1 return_var=$2
+   local endmost_child=$1
+   local -n return_var=$2
    local _parent_backing_file=
    local _backing_file=
    local i=0
    local _ret=
 
-   eval "$return_var[$i]=\"$endmost_child\""
+   return_var[$i]="$endmost_child"
 
    _ret=1
 
    get_backing_file "$endmost_child" _parent_backing_file
-   while [ -n "$_parent_backing_file" ]; do
-      ((i++))
-      eval "$return_var[$i]=\"$_parent_backing_file\""
-      #get next backing file if it exists
-      _backing_file="$_parent_backing_file"
-      get_backing_file "$_backing_file" _parent_backing_file
-      #print_v d "Next file in backing file chain: '$_parent_backing_file'"
-      _ret=0
-   done 
+   if [ $? -eq 0 ]; then
+      while [ -e "$_parent_backing_file" ]; do
+         ((i++))
+         return_var[$i]="$_parent_backing_file"
+         #get next backing file if it exists
+         _backing_file="$_parent_backing_file"
+         get_backing_file "$_backing_file" _parent_backing_file
+         print_v d "Next file in backing file chain: '$_parent_backing_file'"
+         _ret=0
+      done
+   fi
 
    return $_ret
 }
@@ -186,25 +197,21 @@ function get_snapshot_chain() {
 # Output:   A backing file name
 # Return:   0 on success, non 0 otherwise
 function get_backing_file() {
-   local file_name=$1 return_var=$2
+   local file_name=$1
+   local -n _return_var=$2
    local _ret=
    local _backing_file=
    local version=
 
-   #Issue 45
-   version=$(qemu_img_version)
-   if check_version "$version" '2.10.0'; then
-      share_flag="--force-share"
-   else
-      share_flag=""
-   fi
-
    version=$(qemu_version)
-   _backing_file=$($QEMU_IMG info $share_flag "$file_name" | \
+   _backing_file=$($QEMU_IMG info $QEMU_IMG_SHARE_FLAG "$file_name" | \
       awk '/^backing file: / {$1=$2=""; print $0}'|sed 's/^[ \t]*//')
    _ret=$?
+   if [[ $_ret == 1 ]]; then
+      print_v e "Error in getting backing file: Check if running with sufficient permissions (sudo, apparmor status, etc)"
+   fi
 
-   eval "$return_var=\"$_backing_file\""
+   _return_var="$_backing_file"
 
    return $_ret
 }
@@ -366,6 +373,9 @@ function snapshot_domain() {
    else
       print_v e \
       "Snapshot for '$domain_name' failed! Exit code: $_ret\n'$command_output'"
+      if [[ $command_output =~ "Permission denied" ]]; then
+         print_v e "Check apparmor status or check if running with sufficient permissions"
+      fi
       _ret=1
    fi
 
@@ -537,12 +547,26 @@ function dependencies_check() {
       print_v e "Unsupported $QEMU_IMG version '$version'. Please use 'qemu-img' 1.2.0 or later"
       _ret=2
    fi
+   #Issue 45
+   if check_version "$version" '2.10.0'; then
+      QEMU_IMG_SHARE_FLAG="--force-share"
+      print_v d "$QEMU_IMG version '$version' will use $QEMU_IMG_SHARE_FLAG for file access"
+   fi
+
 
    version=$(qemu_version)
    if check_version "$version" '1.2.0'; then
       print_v d "QEMU/KVM version '$version' is supported"
    else
       print_v e "Unsupported QEMU/KVM version '$version'. Please use QEMU/KVM 1.2.0 or later"
+      _ret=2
+   fi
+
+   version=${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}.${BASH_VERSINFO[2]}
+   if check_version "$version" '4.3.0'; then
+      print_v d "Bash version '$version' is supported"
+   else
+      print_v e "Unsupported BASH version '$version'.  Bash 4.3.0 or later is required for fi-backup > 2.1.1"
       _ret=2
    fi
 
@@ -765,7 +789,7 @@ for DOMAIN in $DOMAINS_NOTRUNNING; do
          get_backing_file "$block_device" backing_file
          j=0
          all_backing_files[$j]=$backing_file
-         while [ -n "$backing_file" ]; do
+         while [ -e "$backing_file" ]; do
             ((j++))
             all_backing_files[$j]=$backing_file
             print_v d "Parent block device: '$backing_file'"
