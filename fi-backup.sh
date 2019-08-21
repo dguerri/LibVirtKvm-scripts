@@ -19,7 +19,7 @@
 # Copyright (C) 2013 2014 2015 Davide Guerri - davide.guerri@gmail.com
 #
 
-VERSION="2.1.1"
+VERSION="2.2.0"
 APP_NAME="fi-backup"
 
 # Fail if one process fails in a pipe
