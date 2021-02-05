@@ -37,9 +37,13 @@ This is the "key" of forward incremental backup: `disk.bimg-<timestamp1>` contai
 Consolidation
 -------------
 
-Consolidation copies the content of backing files into the current image, allowing us to remove them.
-This reduces the number of image files, reduces the size of disk images and improves domain performances.
+Consolidation reduces the number of backing files. This can be done one of two ways. (1) BlockCommit or (2) BlockPull
+BlockCommit copies the content of backing files into the current image, and then removing the backing images.
+BlockPull copies the state of the current image into the last backing image and then removing the original image and child images up to the last backing image.
 
+This reduces the number of image files. See README.md for more information about the advantages of BlockCommit vs BlockPull. Like time to consolidate vs image size. 
+
+Here is an example of consolidation via BlockPull
                                                                Current image
                                                                      |
                                                                      v
@@ -48,24 +52,50 @@ This reduces the number of image files, reduces the size of disk images and impr
     +------------(R/O)-+   +------------------(R/O)-+   +------------------(R/W)-+
 
 
-Running in consolidation mode will "copy" backing images content back into the current image.
+Running in consolidation BlockPull mode will "copy" backing images content into the current image.
 
                                                               Current image
-                                            +--block-pull--+        |
-                                            |              |        v
-    +------------------+   +----------------+-------+   +--v---------------------+
-    |    disk.qcow2    |<--| disk.bimg-<timestamp1> | X | disk.bimg-<timestamp2> |
+                   +--block-pull->+         +--block-pull->+        |
+                   |              |         |              |        v
+    +------------------+   +------v---------+-------+   +--v---------------------+
+    |    disk.qcow2    | X | disk.bimg-<timestamp1> | X | disk.bimg-<timestamp2> |
     +-----------(R/O)--+   +------------------(R/O)-+   +------------------(R/W)-+
 
-After that, old backing files can be deleted.
-`fi-backup.sh` will automatically delete every old backing file with extension `bimg-<timestampX>`. In the example above, `disk.qcow2` will not be automatically deleted and a warning is printed.
-It is safe to manually delete `disk.qcow2`, as the only image needed after the consolidation is `disk.bimg-<timestamp2>`:
+After that, the original image and old backing files can be deleted.
+`fi-backup.sh` will automatically delete every old backing file. :
 
            Current image
                  |
                  v
     +------------------------+
     | disk.bimg-<timestamp2> |
+    +------------------(R/W)-+
+
+Here is an example of consolidation via BlockCommit
+                                                               Current image
+                                                                     |
+                                                                     v
+    +------------------+   +------------------------+   +------------------------+
+    |    disk.qcow2    |<--| disk.bimg-<timestamp1> |<--| disk.bimg-<timestamp2> |
+    +------------(R/O)-+   +------------------(R/O)-+   +------------------(R/W)-+
+
+
+Running in consolidation BlockCommit mode will "copy" backing images content into the current image.
+
+                                                              Current image
+                   +<-block-pull--+         +<-block-pull--+        |
+                   |              |         |              |        v
+    +--------------V---+   +------+---------V-------+   +--+---------------------+
+    |    disk.qcow2    |<--| disk.bimg-<timestamp1> | X | disk.bimg-<timestamp2> |
+    +-----------(R/O)--+   +------------------(R/O)-+   +------------------(R/W)-+
+
+After that, the unused files can be deleted.`fi-backup.sh` will automatically delete every unused file. :
+
+           Current image
+                 |
+                 v
+    +------------------------+
+    |       disk.qcow2       |
     +------------------(R/W)-+
 
 
@@ -83,5 +113,3 @@ Restore of backup with domain state dump can be performed
 
 TBW
 `<qemu-command-line> -incoming "exec: gzip -c -d <path/to/state/file>"`
-
-
