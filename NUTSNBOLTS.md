@@ -74,6 +74,7 @@ After that, the original image and old backing files can be deleted.
     +------------------(R/W)-+
 
 Here is an example of consolidation via BlockCommit
+
                                                                Current image
                                                                      |
                                                                      v
