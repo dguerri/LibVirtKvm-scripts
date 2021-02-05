@@ -44,6 +44,8 @@ BlockPull copies the state of the current image into the last backing image and 
 This reduces the number of image files. See README.md for more information about the advantages of BlockCommit vs BlockPull. Like time to consolidate vs image size. 
 
 Here is an example of consolidation via BlockPull
+
+
                                                                Current image
                                                                      |
                                                                      v
